@@ -1,0 +1,172 @@
+# rdkit-rag
+
+A small, local-first RAG (retrieval-augmented generation) tool for exploring
+the [RDKit](https://github.com/rdkit/rdkit) codebase in natural language.
+
+Point it at a local RDKit checkout, index it, and then search or ask
+questions. Everything runs on your machine: embeddings are generated with
+`sentence-transformers`, and answers are generated with a local
+[Ollama](https://ollama.com) model. No API keys, no cloud services.
+
+This is an MVP. It favors simplicity and readability over completeness -
+see [Current limitations](#current-limitations).
+
+## Architecture
+
+```
+RDKit repository
+        |
+        v
+File Scanner (.py, .cpp/.cc/.cxx/.h/.hpp, .md/.rst)
+        |
+        v
+Code / Documentation Chunker
+   (Python: ast module — Markdown/RST: sections)
+   (C/C++: heuristic brace matching)
+        |
+        v
+sentence-transformers Embeddings
+        |
+        v
+Local Storage (.data/)
+   chunks.jsonl + embeddings.npy + index_metadata.json
+        |
+        v
+NumPy Cosine Similarity Search
+        |
+        v
+Top Relevant Chunks
+        |
+        v
+Ollama (local LLM)
+        |
+        v
+Answer + Source Citations
+```
+
+## Requirements
+
+- Python 3.11+
+- [Ollama](https://ollama.com) installed and running locally (only needed
+  for `rdkit-rag ask` - not for `index` or `search`)
+- A local clone of the RDKit repository (or any codebase, really)
+
+## Installation
+
+```bash
+git clone <this-repo> rdkit-rag
+cd rdkit-rag
+pip install -e ".[dev]"
+```
+
+This installs the `rdkit-rag` CLI along with its runtime dependencies
+(`typer`, `pydantic`, `sentence-transformers`, `numpy`, `ollama`,
+`python-dotenv`) and `pytest` for running the test suite.
+
+## Ollama setup
+
+1. Install Ollama: https://ollama.com/download
+2. Start the server (usually automatic after install, or run `ollama serve`).
+3. Pull a model, e.g.:
+
+   ```bash
+   ollama pull qwen3:8b
+   ```
+
+4. Make sure `OLLAMA_MODEL` (see below) matches the model you pulled.
+
+`rdkit-rag ask` checks that Ollama is reachable and that the configured
+model is available before doing any retrieval work, and prints a clear
+error if not. `rdkit-rag index` and `rdkit-rag search` don't need Ollama
+at all.
+
+## Configuration
+
+Copy `.env.example` to `.env` and adjust as needed:
+
+```bash
+cp .env.example .env
+```
+
+```ini
+EMBEDDING_MODEL=BAAI/bge-small-en-v1.5   # any sentence-transformers model
+OLLAMA_MODEL=qwen3:8b                    # any model you've `ollama pull`ed
+OLLAMA_HOST=http://localhost:11434       # default Ollama host
+```
+
+No API keys are required anywhere.
+
+## Usage
+
+### 1. Index a repository
+
+```bash
+rdkit-rag index /path/to/rdkit
+```
+
+This scans supported files, chunks them, generates embeddings, and stores
+everything under `.data/` in the current directory. If an index already
+exists there, re-running requires `--force`:
+
+```bash
+rdkit-rag index /path/to/rdkit --force
+```
+
+### 2. Search (no LLM required)
+
+```bash
+rdkit-rag search "Where is molecule sanitization implemented?"
+rdkit-rag search "How are SMILES parsed?" --top-k 5
+```
+
+Prints the top matching chunks with file, symbol, and line-range info plus
+the chunk content, ranked by cosine similarity.
+
+### 3. Ask a question (uses Ollama)
+
+```bash
+rdkit-rag ask "How does RDKit sanitize a molecule?"
+rdkit-rag ask "How does RDKit sanitize a molecule?" --top-k 8 --show-context
+```
+
+Retrieves relevant chunks, builds a bounded context window, sends it to the
+local Ollama model along with the question, and prints the answer followed
+by the exact sources it was grounded in:
+
+```
+ANSWER
+
+RDKit sanitization is handled primarily by ...
+
+SOURCES USED
+
+1. Code/GraphMol/MolOps.cpp:123-180
+2. Code/GraphMol/testMolOps.cpp:45-90
+```
+
+## Running tests
+
+```bash
+pytest
+```
+
+Tests use small fixture strings/files rather than the full RDKit repository,
+and the embedding model is mocked in retrieval tests so no model download
+is required to run the suite.
+
+## Current limitations
+
+- Vector search only - no lexical/keyword search, no hybrid retrieval, no
+  reranking.
+- C/C++ chunking is heuristic (signature detection + brace counting), not a
+  real parser. It handles typical function/method definitions well but can
+  miss unusual formatting; it falls back to overlapping line-based chunks
+  when it can't confidently find functions in a file.
+- No call graph or cross-reference analysis.
+- No Python/C++ binding detection (e.g. linking `rdkit.Chem` Python calls to
+  their C++ implementations).
+- No test-to-implementation relationship detection.
+- Indexing is full-rebuild only - there's no incremental/diff-based
+  re-indexing yet.
+- Designed for a single local repository, not for scaling to many
+  repositories or many concurrent users.
