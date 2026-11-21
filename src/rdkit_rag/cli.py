@@ -9,8 +9,13 @@ import typer
 from .answering import answer_question
 from .config import get_config
 from .indexer import IndexAlreadyExistsError, RepositoryNotFoundError, run_index
-from .ollama_client import OllamaClient
-from .retriever import EmptyIndexError, Retriever
+from .ollama_client import (
+    OllamaClient,
+    OllamaModelNotFoundError,
+    OllamaRequestError,
+    OllamaUnavailableError,
+)
+from .retriever import CorruptIndexError, EmptyIndexError, Retriever
 
 app = typer.Typer(
     name="rdkit-rag",
@@ -49,14 +54,14 @@ def index(
 @app.command()
 def search(
     query: str = typer.Argument(..., help="Natural-language search query."),
-    top_k: int = typer.Option(8, "--top-k", help="Number of results to return."),
+    top_k: int = typer.Option(8, "--top-k", min=1, help="Number of results to return."),
 ) -> None:
     """Search the indexed repository with a natural-language query."""
     config = get_config()
     retriever = Retriever(config)
     try:
         results = retriever.search(query, top_k=top_k)
-    except EmptyIndexError as e:
+    except (EmptyIndexError, CorruptIndexError) as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
@@ -89,7 +94,7 @@ def search(
 @app.command()
 def ask(
     question: str = typer.Argument(..., help="Natural-language question."),
-    top_k: int = typer.Option(6, "--top-k", help="Number of chunks to retrieve."),
+    top_k: int = typer.Option(6, "--top-k", min=1, help="Number of chunks to retrieve."),
     show_context: bool = typer.Option(
         False, "--show-context", help="Print the retrieved context sent to Ollama."
     ),
@@ -98,19 +103,27 @@ def ask(
     config = get_config()
     ollama_client = OllamaClient(model=config.ollama_model, host=config.ollama_host)
 
-    if not ollama_client.is_available():
+    try:
+        ollama_client.check_available()
+    except OllamaUnavailableError as e:
         typer.secho("Ollama is not available.", fg=typer.colors.RED)
         typer.echo()
-        typer.echo("Make sure Ollama is installed and running.")
+        typer.echo(str(e))
         typer.echo()
-        typer.echo("Also ensure the configured model is available:")
-        typer.echo(f"OLLAMA_MODEL={config.ollama_model}")
+        typer.echo("Make sure Ollama is installed and running (e.g. 'ollama serve').")
+        typer.echo(f"OLLAMA_HOST={config.ollama_host}")
+        raise typer.Exit(code=1)
+    except OllamaModelNotFoundError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        typer.echo()
+        typer.echo("Set OLLAMA_MODEL (e.g. in .env) to one of the installed models,")
+        typer.echo(f"or pull it with: ollama pull {config.ollama_model}")
         raise typer.Exit(code=1)
 
     retriever = Retriever(config)
     try:
         result = answer_question(question, retriever, ollama_client, top_k=top_k)
-    except EmptyIndexError as e:
+    except (EmptyIndexError, CorruptIndexError, OllamaRequestError) as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(code=1)
 

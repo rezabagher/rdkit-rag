@@ -78,3 +78,22 @@ def test_retriever_returns_most_relevant_chunk(tmp_path: Path):
     assert len(results) == 1
     assert results[0].chunk.symbol_name == "sanitizeMol"
     assert results[0].score > 0.99
+
+
+def test_retriever_rejects_mismatched_index(tmp_path: Path):
+    import pytest
+
+    from rdkit_rag.retriever import CorruptIndexError
+
+    config = Config(data_dir=tmp_path)
+    chunk = Chunk(id="a", file_path="a.py", language="Python", start_line=1, end_line=1, content="x")
+    save_chunks([chunk, chunk], config.chunks_path)
+    save_embeddings(np.ones((1, 3), dtype="float32"), config.embeddings_path)
+    retriever = Retriever(config, embedding_service=FakeEmbeddingService(np.ones(3, dtype="float32")))
+    with pytest.raises(CorruptIndexError):
+        retriever.search("q")
+
+
+def test_cosine_similarity_search_handles_non_positive_top_k():
+    embeddings = np.eye(3, dtype="float32")
+    assert cosine_similarity_search(np.ones(3, dtype="float32"), embeddings, 0) == []

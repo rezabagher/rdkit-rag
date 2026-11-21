@@ -76,7 +76,7 @@ This installs the `rdkit-rag` CLI along with its runtime dependencies
 4. Make sure `OLLAMA_MODEL` (see below) matches the model you pulled.
 
 `rdkit-rag ask` checks that Ollama is reachable and that the configured
-model is available before doing any retrieval work, and prints a clear
+model (exact tag, e.g. `qwen3:8b` is not satisfied by `qwen3:1.7b`) is available before doing any retrieval work, and prints a clear
 error if not. `rdkit-rag index` and `rdkit-rag search` don't need Ollama
 at all.
 
@@ -105,7 +105,9 @@ rdkit-rag index /path/to/rdkit
 ```
 
 This scans supported files, chunks them, generates embeddings, and stores
-everything under `.data/` in the current directory. If an index already
+everything under `.data/` in the current directory. If the target is a git
+checkout, git-ignored files are skipped (e.g. the third-party sources RDKit's
+CMake build downloads into `External/`). If an index already
 exists there, re-running requires `--force`:
 
 ```bash
@@ -166,6 +168,9 @@ is required to run the suite.
 - No Python/C++ binding detection (e.g. linking `rdkit.Chem` Python calls to
   their C++ implementations).
 - No test-to-implementation relationship detection.
+- The index records which embedding model built it, and `search`/`ask`
+  always embed queries with that model. Changing `EMBEDDING_MODEL` therefore
+  requires `rdkit-rag index ... --force` to take effect.
 - Indexing is full-rebuild only - there's no incremental/diff-based
   re-indexing yet.
 - Designed for a single local repository, not for scaling to many

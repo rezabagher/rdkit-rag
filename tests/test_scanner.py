@@ -47,3 +47,33 @@ def test_returns_repository_relative_paths(tmp_path: Path):
     _write(tmp_path / "Docs" / "sanitization.md", "# Title\n")
     results = scan_repository(tmp_path)
     assert results == ["Docs/sanitization.md"]
+
+
+def test_respects_gitignore_in_git_repos(tmp_path: Path):
+    import shutil
+    import subprocess
+
+    import pytest
+
+    if shutil.which("git") is None:
+        pytest.skip("git not installed")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    _write(tmp_path / ".gitignore", "External/Eigen/eigen/\n")
+    _write(tmp_path / "External" / "Eigen" / "eigen" / "Core.h", "int x;\n")
+    _write(tmp_path / "Code" / "MolOps.cpp", "void f() {}\n")
+    results = scan_repository(tmp_path)
+    assert results == ["Code/MolOps.cpp"]
+
+
+def test_falls_back_to_walk_when_inside_repo_that_ignores_it(tmp_path: Path):
+    import shutil
+    import subprocess
+
+    import pytest
+
+    if shutil.which("git") is None:
+        pytest.skip("git not installed")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    _write(tmp_path / ".gitignore", "rdkit/\n")
+    _write(tmp_path / "rdkit" / "Code" / "a.py")
+    assert scan_repository(tmp_path / "rdkit") == ["Code/a.py"]

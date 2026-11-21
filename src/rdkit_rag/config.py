@@ -11,11 +11,13 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
-# Load a .env file from the current working directory if present. This is a
+# Load a .env file from the current working directory (or its parents) if
+# present. usecwd=True matters: without it python-dotenv searches upward from
+# *this module's* location, not from where the command is run. This is a
 # no-op if no .env file exists, so it's safe to call unconditionally.
-load_dotenv()
+load_dotenv(find_dotenv(usecwd=True))
 
 
 @dataclass(frozen=True)

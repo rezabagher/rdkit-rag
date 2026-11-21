@@ -31,6 +31,19 @@ def build_contextual_text(chunk: Chunk) -> str:
     )
 
 
+# BGE v1.5 English models are trained with an instruction prefix for short
+# retrieval queries (passages are embedded without it). See the BAAI model
+# cards for bge-*-en-v1.5.
+_BGE_QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
+
+
+def query_instruction_for(model_name: str) -> str:
+    name = model_name.lower()
+    if "bge-" in name and "-en" in name:
+        return _BGE_QUERY_INSTRUCTION
+    return ""
+
+
 class EmbeddingService:
     """Wraps a single sentence-transformers model."""
 
@@ -64,7 +77,7 @@ class EmbeddingService:
         """Embed a single query string."""
         model = self._load()
         embedding = model.encode(
-            [text],
+            [query_instruction_for(self.model_name) + text],
             normalize_embeddings=True,
             convert_to_numpy=True,
         )

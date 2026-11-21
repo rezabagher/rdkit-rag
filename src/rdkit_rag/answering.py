@@ -11,6 +11,11 @@ from .retriever import Retriever, SearchResult
 # chunks are truncated first if the total would exceed this.
 MAX_CONTEXT_CHARS = 12_000
 
+# A truncated block shorter than this isn't worth sending.
+_MIN_TRUNCATED_BLOCK_CHARS = 200
+
+_TRUNCATION_MARKER = "\n...[truncated]"
+
 
 @dataclass
 class AnswerResult:
@@ -19,29 +24,48 @@ class AnswerResult:
     context: str
 
 
-def build_context(results: list[SearchResult], max_chars: int = MAX_CONTEXT_CHARS) -> str:
-    parts = []
+def _format_block(index: int, result: SearchResult) -> str:
+    chunk = result.chunk
+    return (
+        f"[SOURCE {index}]\n"
+        f"File:\n{chunk.file_path}\n\n"
+        f"Symbol:\n{chunk.symbol_name or '(none)'}\n\n"
+        f"Lines:\n{chunk.start_line}-{chunk.end_line}\n\n"
+        f"Content:\n\n{chunk.content}\n"
+    )
+
+
+def select_context(
+    results: list[SearchResult], max_chars: int = MAX_CONTEXT_CHARS
+) -> tuple[str, list[SearchResult]]:
+    """Build the context string and return it together with the results that
+    actually made it into the context (so cited sources match what the model
+    saw). Higher-ranked results win; the last one that doesn't fit is
+    truncated if a useful amount of it fits, and everything after is dropped.
+    """
+    separator = "\n"
+    parts: list[str] = []
+    included: list[SearchResult] = []
     used = 0
-    for i, result in enumerate(results, start=1):
-        chunk = result.chunk
-        block = (
-            f"[SOURCE {i}]\n"
-            f"File:\n{chunk.file_path}\n\n"
-            f"Symbol:\n{chunk.symbol_name or '(none)'}\n\n"
-            f"Lines:\n{chunk.start_line}-{chunk.end_line}\n\n"
-            f"Content:\n\n{chunk.content}\n"
-        )
-        if used + len(block) > max_chars and parts:
-            # Truncate lower-ranked chunks first rather than dropping the
-            # whole block, so at least some content survives.
-            remaining = max(max_chars - used, 0)
-            if remaining > 200:
-                block = block[:remaining] + "\n...[truncated]"
-                parts.append(block)
+    for result in results:
+        block = _format_block(len(parts) + 1, result)
+        sep_len = len(separator) if parts else 0
+        remaining = max_chars - used - sep_len
+        if len(block) > remaining:
+            budget = remaining - len(_TRUNCATION_MARKER)
+            if budget >= _MIN_TRUNCATED_BLOCK_CHARS or (not parts and budget > 0):
+                # Always keep at least part of the top-ranked result.
+                parts.append(block[:budget] + _TRUNCATION_MARKER)
+                included.append(result)
             break
         parts.append(block)
-        used += len(block)
-    return "\n".join(parts)
+        included.append(result)
+        used += sep_len + len(block)
+    return separator.join(parts), included
+
+
+def build_context(results: list[SearchResult], max_chars: int = MAX_CONTEXT_CHARS) -> str:
+    return select_context(results, max_chars)[0]
 
 
 def format_sources(results: list[SearchResult]) -> list[str]:
@@ -55,9 +79,9 @@ def answer_question(
     retriever: Retriever,
     ollama_client: OllamaClient,
     top_k: int = 6,
+    max_context_chars: int = MAX_CONTEXT_CHARS,
 ) -> AnswerResult:
     results = retriever.search(question, top_k=top_k)
-    context = build_context(results)
+    context, included = select_context(results, max_context_chars)
     answer = ollama_client.ask(question, context)
-    sources = format_sources(results)
-    return AnswerResult(answer=answer, sources=sources, context=context)
+    return AnswerResult(answer=answer, sources=format_sources(included), context=context)
