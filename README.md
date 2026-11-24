@@ -175,3 +175,5 @@ is required to run the suite.
   re-indexing yet.
 - Designed for a single local repository, not for scaling to many
   repositories or many concurrent users.
+
+See [ROADMAP.md](ROADMAP.md) for planned work.
