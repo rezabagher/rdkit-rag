@@ -80,8 +80,9 @@ def answer_question(
     ollama_client: OllamaClient,
     top_k: int = 6,
     max_context_chars: int = MAX_CONTEXT_CHARS,
+    mode: str = "hybrid",
 ) -> AnswerResult:
-    results = retriever.search(question, top_k=top_k)
+    results = retriever.search(question, top_k=top_k, mode=mode)
     context, included = select_context(results, max_context_chars)
     answer = ollama_client.ask(question, context)
     return AnswerResult(answer=answer, sources=format_sources(included), context=context)

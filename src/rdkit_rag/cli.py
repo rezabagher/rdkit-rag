@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
 
 import typer
@@ -16,6 +17,29 @@ from .ollama_client import (
     OllamaUnavailableError,
 )
 from .retriever import CorruptIndexError, EmptyIndexError, Retriever
+
+class SearchMode(str, Enum):
+    hybrid = "hybrid"
+    vector = "vector"
+    keyword = "keyword"
+
+
+MODE_HELP = (
+    "hybrid: combine meaning-based (vector) and keyword (BM25) ranking; "
+    "vector: meaning only; keyword: exact words and identifiers only "
+    "(fast, no embedding model needed)."
+)
+
+
+def _describe_score(result) -> str:
+    ranks = []
+    if result.vector_rank is not None:
+        ranks.append(f"vector #{result.vector_rank}")
+    if result.keyword_rank is not None:
+        ranks.append(f"keyword #{result.keyword_rank}")
+    suffix = f"  ({', '.join(ranks)})" if ranks else ""
+    return f"Score: {result.score:.4g}{suffix}"
+
 
 app = typer.Typer(
     name="rdkit-rag",
@@ -55,12 +79,13 @@ def index(
 def search(
     query: str = typer.Argument(..., help="Natural-language search query."),
     top_k: int = typer.Option(8, "--top-k", min=1, help="Number of results to return."),
+    mode: SearchMode = typer.Option(SearchMode.hybrid, "--mode", help=MODE_HELP),
 ) -> None:
     """Search the indexed repository with a natural-language query."""
     config = get_config()
     retriever = Retriever(config)
     try:
-        results = retriever.search(query, top_k=top_k)
+        results = retriever.search(query, top_k=top_k, mode=mode.value)
     except (EmptyIndexError, CorruptIndexError) as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(code=1)
@@ -73,7 +98,7 @@ def search(
         chunk = result.chunk
         typer.echo("-" * 60)
         typer.echo()
-        typer.echo(f"{rank}. Score: {result.score:.2f}")
+        typer.echo(f"{rank}. {_describe_score(result)}")
         typer.echo()
         typer.echo("File:")
         typer.echo(chunk.file_path)
@@ -95,6 +120,7 @@ def search(
 def ask(
     question: str = typer.Argument(..., help="Natural-language question."),
     top_k: int = typer.Option(6, "--top-k", min=1, help="Number of chunks to retrieve."),
+    mode: SearchMode = typer.Option(SearchMode.hybrid, "--mode", help=MODE_HELP),
     show_context: bool = typer.Option(
         False, "--show-context", help="Print the retrieved context sent to Ollama."
     ),
@@ -122,7 +148,9 @@ def ask(
 
     retriever = Retriever(config)
     try:
-        result = answer_question(question, retriever, ollama_client, top_k=top_k)
+        result = answer_question(
+            question, retriever, ollama_client, top_k=top_k, mode=mode.value
+        )
     except (EmptyIndexError, CorruptIndexError, OllamaRequestError) as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(code=1)

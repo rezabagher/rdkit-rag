@@ -55,6 +55,14 @@ class Config:
     def metadata_path(self) -> Path:
         return self.data_dir / "index_metadata.json"
 
+    @property
+    def keyword_weights_path(self) -> Path:
+        return self.data_dir / "bm25_weights.npz"
+
+    @property
+    def keyword_vocab_path(self) -> Path:
+        return self.data_dir / "bm25_vocab.json"
+
 
 def get_config() -> Config:
     """Return a fresh Config read from the current environment.
