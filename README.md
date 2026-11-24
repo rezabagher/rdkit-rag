@@ -203,3 +203,8 @@ is required to run the suite.
   repositories or many concurrent users.
 
 See [ROADMAP.md](ROADMAP.md) for planned work.
+
+## License
+
+rdkit-rag is released under the BSD 3-Clause License, the same license as
+RDKit. See [LICENSE](LICENSE).
