@@ -1,12 +1,18 @@
 # rdkit-rag
 
-A small, local-first RAG (retrieval-augmented generation) tool for exploring
-the [RDKit](https://github.com/rdkit/rdkit) codebase in natural language.
-
-Point it at a local RDKit checkout, index it, and then search or ask
-questions. Everything runs on your machine: embeddings are generated with
-`sentence-transformers`, and answers are generated with a local
-[Ollama](https://ollama.com) model. No API keys, no cloud services.
+rdkit-rag is a local question-answering tool for the
+[RDKit](https://github.com/rdkit/rdkit) cheminformatics codebase. RDKit is a
+large mix of C++ and Python, about 2,200 source and doc files, and it's hard
+to find where a feature is implemented: `grep` only finds exact words, and the
+whole repo is far too big to paste into an AI model. rdkit-rag splits the code
+into meaningful pieces (Python functions via the `ast` module, C++ functions
+via signature and brace matching, docs by section). It turns each piece into
+an embedding vector stored on disk, and when you ask a question in plain
+English it finds the most relevant pieces by cosine similarity. A local LLM
+running in [Ollama](https://ollama.com) then answers from that code and cites
+the exact files and line numbers it used. Everything runs on your own machine
+with no API keys or cloud services. Developers can explore an unfamiliar
+codebase in natural language and check every claim against the real source.
 
 This is an MVP. It favors simplicity and readability over completeness -
 see [Current limitations](#current-limitations).
