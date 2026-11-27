@@ -1,0 +1,43 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          # CPU-only torch: the tests never load a model, and the default
+          # CUDA wheels are about 2 GB larger.
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install ".[dev]"
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Check the installed package
+        # Run outside the checkout so the installed package is used, not src/.
+        working-directory: ${{ runner.temp }}
+        run: |
+          rdkit-rag --help
+          python -c "from rdkit_rag.evaluation import default_questions_path, load_questions; n = len(load_questions(default_questions_path()).questions); print(n, 'questions'); assert n > 0"
