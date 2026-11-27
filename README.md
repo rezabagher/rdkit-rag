@@ -114,12 +114,40 @@ rdkit-rag index /path/to/rdkit
 This scans supported files, chunks them, generates embeddings, and stores
 everything under `.data/` in the current directory. If the target is a git
 checkout, git-ignored files are skipped (e.g. the third-party sources RDKit's
-CMake build downloads into `External/`). If an index already
-exists there, re-running requires `--force`:
+CMake build downloads into `External/`).
+
+#### Keeping the index up to date
+
+RDKit changes every day, but you never need to rebuild from scratch. After
+`git pull` (or checking out another branch), run the same command again:
+
+```bash
+rdkit-rag index /path/to/rdkit
+```
+
+Re-running re-chunks the repository (a few seconds) and reuses the stored
+embedding of every chunk whose text didn't change. Only new or changed code
+is embedded, which is the slow part. Deleted files drop out of the index. The
+result is the same as a full rebuild. The output shows what happened, e.g.
+`Updated: 37 new/changed chunks embedded, 24,967 reused`, and the index
+records the git commit it was built from.
+
+To update automatically after every pull or merge, add a `post-merge` hook to
+your RDKit checkout (`/path/to/rdkit/.git/hooks/post-merge`, made executable
+with `chmod +x`):
+
+```sh
+#!/bin/sh
+cd /path/to/rdkit-rag && rdkit-rag index /path/to/rdkit
+```
+
+To ignore the stored embeddings and re-embed everything:
 
 ```bash
 rdkit-rag index /path/to/rdkit --force
 ```
+
+Changing `EMBEDDING_MODEL` triggers a full re-embed automatically.
 
 ### 2. Search (no LLM required)
 
@@ -195,10 +223,11 @@ is required to run the suite.
   their C++ implementations).
 - No test-to-implementation relationship detection.
 - The index records which embedding model built it, and `search`/`ask`
-  always embed queries with that model. Changing `EMBEDDING_MODEL` therefore
-  requires `rdkit-rag index ... --force` to take effect.
-- Indexing is full-rebuild only - there's no incremental/diff-based
-  re-indexing yet.
+  always embed queries with that model. Changing `EMBEDDING_MODEL` takes
+  effect at the next `rdkit-rag index`, which then re-embeds everything.
+- An edit near the top of a file shifts the line numbers of the chunks below
+  it, and line numbers are part of the embedded text, so those chunks are
+  re-embedded too. Updates stay per-file, never whole-repository.
 - Designed for a single local repository, not for scaling to many
   repositories or many concurrent users.
 

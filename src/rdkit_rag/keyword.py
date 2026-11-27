@@ -25,6 +25,7 @@ import numpy as np
 from scipy import sparse
 
 from .models import Chunk
+from .store import atomic_write
 
 # BM25 parameters: k1 controls term-frequency saturation, b controls how much
 # longer chunks are penalized. These are the usual defaults.
@@ -218,12 +219,10 @@ class KeywordIndex:
         return [(int(i), float(scores[i])) for i in top]
 
     def save(self, weights_path: Path, vocab_path: Path) -> None:
-        weights_path.parent.mkdir(parents=True, exist_ok=True)
-        sparse.save_npz(weights_path, self.weights, compressed=False)
-        vocab_path.write_text(
-            json.dumps({"fingerprint": self.fingerprint, "vocab": self.vocab}),
-            encoding="utf-8",
-        )
+        with atomic_write(weights_path, "wb") as f:
+            sparse.save_npz(f, self.weights, compressed=False)
+        with atomic_write(vocab_path) as f:
+            json.dump({"fingerprint": self.fingerprint, "vocab": self.vocab}, f)
 
     @classmethod
     def load(cls, weights_path: Path, vocab_path: Path) -> KeywordIndex | None:

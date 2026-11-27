@@ -11,10 +11,12 @@ measure first, then improve retrieval, then deepen code understanding.
 - Local embeddings (sentence-transformers, BGE) and BM25 keyword search,
   combined into hybrid search
 - `search` and `ask` (Ollama) with cited sources
-- 71 unit tests, no model download needed to run them
+- Incremental updates: re-running `index` embeds only new or changed code
+- 82 unit tests, no model download needed to run them
 
-Measured on RDKit (laptop, GTX 1650 Ti): 2,201 files, 24,015 chunks,
-~20 min to index, ~7 s per search, ~44 s per answer with qwen3:1.7b.
+Measured on RDKit (laptop, GTX 1650 Ti): 2,201 files, 25,004 chunks,
+~20 min for a first full index, ~16 s for an update with no changes,
+~7 s per search, ~44 s per answer with qwen3:1.7b.
 
 ## Phase 1: Measure and improve retrieval
 
@@ -39,7 +41,11 @@ Measured on RDKit (laptop, GTX 1650 Ti): 2,201 files, 24,015 chunks,
 
 ## Phase 3: Day-to-day usability
 
-- [ ] **Incremental indexing**: re-embed only files whose content hash changed.
+- [x] **Incremental indexing**: every run re-chunks the repository and reuses
+  the stored embedding of each chunk whose text is unchanged; only new or
+  changed chunks are embedded. Updating a 21 Nov index (1,470 chunks changed)
+  took 67 s instead of ~20 min. Still to do: re-chunk only files whose
+  content hash changed, to cut the ~16 s no-change update further.
 - [ ] **Persistent server mode**: keep the embedding model loaded, so search
   drops from ~7 s to under 1 s.
 - [ ] **Streaming answers** from Ollama.
