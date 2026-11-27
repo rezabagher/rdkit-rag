@@ -1,0 +1,310 @@
+# Retrieval evaluation set for rdkit-rag on the RDKit codebase.
+#
+# Each question lists where the answer is implemented. A retrieved chunk
+# counts as relevant when its file matches and, if a symbol is given, its
+# symbol name is that symbol (or ends with "::symbol" / ".symbol", so
+# "Atom::calcExplicitValence" matches "calcExplicitValence").
+#
+# The lists name the primary implementation only. A hit on a header, a
+# Python wrapper or a test is counted as a miss, so the scores are a lower
+# bound on what a user would consider a useful answer.
+#
+# category:
+#   concept    - plain-English question that avoids code names
+#   identifier - question that names the function or class
+#
+# Run with:  rdkit-rag eval
+
+rdkit_commit = "ce08c344e86dbb07c86526cca2517436b1e41b02"
+
+# --- concept questions ------------------------------------------------------
+
+[[question]]
+id = "sanitize"
+category = "concept"
+query = "How does RDKit check and clean up a molecule after reading it?"
+relevant = [{ file = "Code/GraphMol/MolOps.cpp", symbol = "sanitizeMol" }]
+
+[[question]]
+id = "kekulize"
+category = "concept"
+query = "How are aromatic bonds converted into alternating single and double bonds?"
+relevant = [{ file = "Code/GraphMol/Kekulize.cpp" }]
+
+[[question]]
+id = "smiles-parse"
+category = "concept"
+query = "How is a SMILES string turned into a molecule object?"
+relevant = [{ file = "Code/GraphMol/SmilesParse/SmilesParse.cpp" }]
+
+[[question]]
+id = "canonical-smiles"
+category = "concept"
+query = "How is the canonical SMILES string of a molecule generated?"
+relevant = [
+  { file = "Code/GraphMol/SmilesParse/SmilesWrite.cpp", symbol = "MolToSmiles" },
+  { file = "Code/GraphMol/new_canon.cpp", symbol = "rankMolAtoms" },
+]
+
+[[question]]
+id = "sssr"
+category = "concept"
+query = "How does RDKit find the smallest set of smallest rings?"
+relevant = [{ file = "Code/GraphMol/FindRings.cpp", symbol = "findSSSR" }]
+
+[[question]]
+id = "aromaticity"
+category = "concept"
+query = "How is the aromaticity of rings detected?"
+relevant = [{ file = "Code/GraphMol/Aromaticity.cpp" }]
+
+[[question]]
+id = "circular-fp"
+category = "concept"
+query = "How are circular fingerprints computed?"
+relevant = [{ file = "Code/GraphMol/Fingerprints/MorganGenerator.cpp" }]
+
+[[question]]
+id = "substructure"
+category = "concept"
+query = "How does RDKit check whether one molecule contains another as a substructure?"
+relevant = [{ file = "Code/GraphMol/Substruct/SubstructMatch.cpp" }]
+
+[[question]]
+id = "canonical-ranking"
+category = "concept"
+query = "How are atoms ranked to give a canonical atom order?"
+relevant = [{ file = "Code/GraphMol/new_canon.cpp" }]
+
+[[question]]
+id = "add-hydrogens"
+category = "concept"
+query = "How are explicit hydrogen atoms added to a molecule?"
+relevant = [{ file = "Code/GraphMol/AddHs.cpp", symbol = "addHs" }]
+
+[[question]]
+id = "conformers"
+category = "concept"
+query = "How are 3D conformers generated with distance geometry?"
+relevant = [{ file = "Code/GraphMol/DistGeomHelpers/Embedder.cpp" }]
+
+[[question]]
+id = "uff-setup"
+category = "concept"
+query = "How is the universal force field set up for a molecule?"
+relevant = [
+  { file = "Code/GraphMol/ForceFieldHelpers/UFF/Builder.cpp", symbol = "constructForceField" },
+]
+
+[[question]]
+id = "molfile-read"
+category = "concept"
+query = "How does RDKit read a molecule from a V2000 connection table?"
+relevant = [{ file = "Code/GraphMol/FileParsers/MolFileParser.cpp" }]
+
+[[question]]
+id = "fp-similarity"
+category = "concept"
+query = "How is the similarity between two bit-vector fingerprints computed?"
+relevant = [{ file = "Code/DataStructs/BitOps.cpp", symbol = "TanimotoSimilarity" }]
+
+[[question]]
+id = "scaffold"
+category = "concept"
+query = "How do you get the core scaffold of a molecule by removing its side chains?"
+relevant = [
+  { file = "Code/GraphMol/ChemTransforms/ChemTransforms.cpp", symbol = "MurckoDecompose" },
+  { file = "rdkit/Chem/Scaffolds/MurckoScaffold.py" },
+]
+
+[[question]]
+id = "logp"
+category = "concept"
+query = "How is the octanol-water partition coefficient estimated?"
+relevant = [{ file = "Code/GraphMol/Descriptors/Crippen.cpp" }]
+
+[[question]]
+id = "partial-charges"
+category = "concept"
+query = "How are partial atomic charges calculated?"
+relevant = [{ file = "Code/GraphMol/PartialCharges/GasteigerCharges.cpp" }]
+
+[[question]]
+id = "2d-coords"
+category = "concept"
+query = "How does RDKit generate 2D coordinates for drawing a molecule?"
+relevant = [{ file = "Code/GraphMol/Depictor/RDDepictor.cpp", symbol = "compute2DCoords" }]
+
+[[question]]
+id = "align-rmsd"
+category = "concept"
+query = "How are two conformers aligned and their RMSD computed?"
+relevant = [{ file = "Code/GraphMol/MolAlign/AlignMolecules.cpp" }]
+
+[[question]]
+id = "tautomers"
+category = "concept"
+query = "How are tautomers enumerated?"
+relevant = [{ file = "Code/GraphMol/MolStandardize/Tautomer.cpp" }]
+
+[[question]]
+id = "mcs"
+category = "concept"
+query = "How does RDKit find the maximum common substructure of several molecules?"
+relevant = [{ file = "Code/GraphMol/FMCS/FMCS.cpp" }]
+
+[[question]]
+id = "neutralize"
+category = "concept"
+query = "How are charged molecules neutralized during standardization?"
+relevant = [{ file = "Code/GraphMol/MolStandardize/Charge.cpp" }]
+
+[[question]]
+id = "salts"
+category = "concept"
+query = "How are salts and counterions stripped from a molecule?"
+relevant = [{ file = "rdkit/Chem/SaltRemover.py" }]
+
+[[question]]
+id = "binary-format"
+category = "concept"
+query = "How is a molecule serialized to a compact binary format?"
+relevant = [{ file = "Code/GraphMol/MolPickler.cpp" }]
+
+[[question]]
+id = "clustering"
+category = "concept"
+query = "How are molecules clustered by fingerprint distance?"
+relevant = [{ file = "rdkit/ML/Cluster/Butina.py", symbol = "ClusterData" }]
+
+[[question]]
+id = "install"
+category = "concept"
+query = "How do I install RDKit?"
+relevant = [{ file = "Docs/Book/Install.md" }]
+
+[[question]]
+id = "stereo-from-3d"
+category = "concept"
+query = "How is stereochemistry assigned from 3D coordinates?"
+relevant = [
+  { file = "Code/GraphMol/Chirality.cpp", symbol = "assignChiralTypesFrom3D" },
+  { file = "Code/GraphMol/Chirality.cpp", symbol = "assignStereochemistryFrom3D" },
+]
+
+[[question]]
+id = "hybridization"
+category = "concept"
+query = "How are atom hybridization states determined?"
+relevant = [{ file = "Code/GraphMol/ConjugHybrid.cpp", symbol = "setHybridization" }]
+
+[[question]]
+id = "stereoisomers"
+category = "concept"
+query = "How are all stereoisomers of a molecule enumerated?"
+relevant = [{ file = "rdkit/Chem/EnumerateStereoisomers.py" }]
+
+[[question]]
+id = "drug-likeness"
+category = "concept"
+query = "How do I compute a drug-likeness score for a molecule?"
+relevant = [{ file = "rdkit/Chem/QED.py", symbol = "qed" }]
+
+# --- identifier questions ---------------------------------------------------
+
+[[question]]
+id = "sanitizeMol"
+category = "identifier"
+query = "Where is sanitizeMol implemented?"
+relevant = [{ file = "Code/GraphMol/MolOps.cpp", symbol = "sanitizeMol" }]
+
+[[question]]
+id = "MolToSmiles"
+category = "identifier"
+query = "MolToSmiles"
+relevant = [{ file = "Code/GraphMol/SmilesParse/SmilesWrite.cpp", symbol = "MolToSmiles" }]
+
+[[question]]
+id = "MolFromSmarts"
+category = "identifier"
+query = "Where is MolFromSmarts defined?"
+relevant = [{ file = "Code/GraphMol/SmilesParse/SmilesParse.cpp", symbol = "MolFromSmarts" }]
+
+[[question]]
+id = "run_Reactants"
+category = "identifier"
+query = "What does run_Reactants do when running a chemical reaction?"
+relevant = [{ file = "Code/GraphMol/ChemReactions/ReactionRunner.cpp", symbol = "run_Reactants" }]
+
+[[question]]
+id = "EmbedMultipleConfs"
+category = "identifier"
+query = "EmbedMultipleConfs"
+relevant = [{ file = "Code/GraphMol/DistGeomHelpers/Embedder.cpp", symbol = "EmbedMultipleConfs" }]
+
+[[question]]
+id = "calcTPSA"
+category = "identifier"
+query = "How does calcTPSA work?"
+relevant = [{ file = "Code/GraphMol/Descriptors/MolSurf.cpp", symbol = "calcTPSA" }]
+
+[[question]]
+id = "removeHs"
+category = "identifier"
+query = "removeHs implementation"
+relevant = [{ file = "Code/GraphMol/AddHs.cpp", symbol = "removeHs" }]
+
+[[question]]
+id = "getMolFrags"
+category = "identifier"
+query = "How does getMolFrags split a molecule into fragments?"
+relevant = [{ file = "Code/GraphMol/MolOps.cpp", symbol = "getMolFrags" }]
+
+[[question]]
+id = "AssignBondOrdersFromTemplate"
+category = "identifier"
+query = "AssignBondOrdersFromTemplate"
+relevant = [{ file = "rdkit/Chem/AllChem.py", symbol = "AssignBondOrdersFromTemplate" }]
+
+[[question]]
+id = "computeGasteigerCharges"
+category = "identifier"
+query = "Where is computeGasteigerCharges?"
+relevant = [
+  { file = "Code/GraphMol/PartialCharges/GasteigerCharges.cpp", symbol = "computeGasteigerCharges" },
+]
+
+[[question]]
+id = "RGroupDecompose"
+category = "identifier"
+query = "Where is RGroupDecompose implemented?"
+relevant = [
+  { file = "Code/GraphMol/RGroupDecomposition/RGroupDecomp.cpp", symbol = "RGroupDecompose" },
+]
+
+[[question]]
+id = "SDMolSupplier-next"
+category = "identifier"
+query = "What does SDMolSupplier::next do?"
+relevant = [{ file = "Code/GraphMol/FileParsers/SDMolSupplier.cpp", symbol = "SDMolSupplier::next" }]
+
+[[question]]
+id = "MaxMinPicker"
+category = "identifier"
+query = "How does MaxMinPicker lazyPick choose diverse molecules?"
+relevant = [{ file = "Code/SimDivPickers/MaxMinPicker.h", symbol = "MaxMinPicker::lazyPick" }]
+
+[[question]]
+id = "Uncharger"
+category = "identifier"
+query = "How does the Uncharger work?"
+relevant = [
+  { file = "Code/GraphMol/MolStandardize/Charge.cpp", symbol = "Uncharger::uncharge" },
+  { file = "Code/GraphMol/MolStandardize/Charge.cpp", symbol = "Uncharger::unchargeInPlace" },
+]
+
+[[question]]
+id = "GetFraggleSimilarity"
+category = "identifier"
+query = "GetFraggleSimilarity"
+relevant = [{ file = "rdkit/Chem/Fraggle/FraggleSim.py", symbol = "GetFraggleSimilarity" }]

@@ -1,7 +1,8 @@
-"""CLI entrypoints for rdkit-rag: index, search, ask."""
+"""CLI entrypoints for rdkit-rag: index, search, ask, eval."""
 
 from __future__ import annotations
 
+import json
 from enum import Enum
 from pathlib import Path
 
@@ -9,6 +10,13 @@ import typer
 
 from .answering import answer_question
 from .config import get_config
+from .evaluation import (
+    QuestionSetError,
+    evaluate,
+    load_questions,
+    missing_targets,
+    report_to_dict,
+)
 from .indexer import RepositoryNotFoundError, run_index
 from .ollama_client import (
     OllamaClient,
@@ -17,6 +25,7 @@ from .ollama_client import (
     OllamaUnavailableError,
 )
 from .retriever import CorruptIndexError, EmptyIndexError, Retriever
+from .store import load_metadata
 
 class SearchMode(str, Enum):
     hybrid = "hybrid"
@@ -179,6 +188,119 @@ def ask(
     typer.echo()
     for i, source in enumerate(result.sources, start=1):
         typer.echo(f"{i}. {source}")
+
+
+class EvalMode(str, Enum):
+    all = "all"
+    hybrid = "hybrid"
+    vector = "vector"
+    keyword = "keyword"
+
+
+DEFAULT_QUESTIONS = Path("eval/rdkit_questions.toml")
+
+
+@app.command("eval")
+def eval_command(
+    questions: Path = typer.Argument(
+        DEFAULT_QUESTIONS, help="Question set (TOML) with the known relevant locations."
+    ),
+    mode: EvalMode = typer.Option(
+        EvalMode.all, "--mode", help="Search mode to evaluate, or 'all' to compare them."
+    ),
+    k: list[int] = typer.Option(
+        [1, 5, 10], "--k", min=1, help="Cut-offs for Recall@k (repeatable)."
+    ),
+    details: bool = typer.Option(
+        False, "--details", help="Show the rank of the first relevant result per question."
+    ),
+    output: Path | None = typer.Option(
+        None, "--output", help="Also write the full results as JSON to this file."
+    ),
+) -> None:
+    """Measure retrieval quality (Recall@k, MRR) on a fixed question set."""
+    try:
+        question_set = load_questions(questions)
+    except QuestionSetError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    config = get_config()
+    retriever = Retriever(config)
+    try:
+        chunks = retriever.chunks
+    except (EmptyIndexError, CorruptIndexError) as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    metadata = load_metadata(config.metadata_path)
+    index_commit = metadata.repository_commit if metadata else None
+    if question_set.commit and index_commit and index_commit != question_set.commit:
+        typer.secho(
+            f"Note: the index is of commit {index_commit[:12]}, but the question "
+            f"set was checked against {question_set.commit[:12]}.",
+            fg=typer.colors.YELLOW,
+        )
+    for qid, target in missing_targets(chunks, question_set):
+        where = f"{target.file}" + (f" ({target.symbol})" if target.symbol else "")
+        typer.secho(
+            f"Warning: {qid}: no indexed chunk matches {where}", fg=typer.colors.YELLOW
+        )
+
+    modes = ["hybrid", "vector", "keyword"] if mode is EvalMode.all else [mode.value]
+    ks = tuple(sorted(set(k)))
+    reports = []
+    try:
+        for m in modes:
+            reports.append(evaluate(retriever, question_set, m, ks))
+    except CorruptIndexError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    counts: dict[str, int] = {}
+    for q in question_set.questions:
+        counts[q.category] = counts.get(q.category, 0) + 1
+    summary = ", ".join(f"{n} {name}" for name, n in sorted(counts.items()))
+    typer.echo()
+    typer.echo(f"{len(question_set.questions)} questions ({summary})")
+    typer.echo()
+
+    header = f"{'mode':<20}" + "".join(f"{'R@' + str(x):>8}" for x in ks) + f"{'MRR':>8}"
+    typer.echo(header)
+    typer.echo("-" * len(header))
+
+    def row(label: str, scores) -> str:
+        cells = "".join(f"{scores.recall[x]:>8.2f}" for x in ks)
+        return f"{label:<20}{cells}{scores.mrr:>8.2f}"
+
+    for report in reports:
+        typer.echo(row(report.mode, report.overall))
+        if len(report.by_category) > 1:
+            for name, scores in report.by_category.items():
+                typer.echo(row(f"  {name}", scores))
+    typer.echo()
+    typer.echo(f"MRR is computed over the top {ks[-1]} results.")
+
+    if details:
+        typer.echo()
+        typer.echo(f"{'question':<30}{'category':<12}" + "".join(f"{m:>9}" for m in modes))
+        for q in question_set.questions:
+            ranks = "".join(
+                f"{(str(r.ranks[q.id]) if r.ranks[q.id] else '-'):>9}" for r in reports
+            )
+            typer.echo(f"{q.id:<30}{q.category:<12}{ranks}")
+
+    if output is not None:
+        payload = {
+            "questions": str(questions),
+            "question_set_commit": question_set.commit,
+            "index_commit": index_commit,
+            "embedding_model": metadata.embedding_model if metadata else None,
+            "ks": list(ks),
+            "results": [report_to_dict(r) for r in reports],
+        }
+        output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        typer.echo(f"Results written to {output}")
 
 
 if __name__ == "__main__":

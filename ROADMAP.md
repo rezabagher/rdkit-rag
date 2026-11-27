@@ -12,7 +12,8 @@ measure first, then improve retrieval, then deepen code understanding.
   combined into hybrid search
 - `search` and `ask` (Ollama) with cited sources
 - Incremental updates: re-running `index` embeds only new or changed code
-- 82 unit tests, no model download needed to run them
+- `rdkit-rag eval`: 45-question benchmark reporting Recall@k and MRR
+- 102 unit tests, no model download needed to run them
 
 Measured on RDKit (laptop, GTX 1650 Ti): 2,201 files, 25,004 chunks,
 ~20 min for a first full index, ~16 s for an update with no changes,
@@ -20,15 +21,22 @@ Measured on RDKit (laptop, GTX 1650 Ti): 2,201 files, 25,004 chunks,
 
 ## Phase 1: Measure and improve retrieval
 
-- [ ] **Evaluation set**: 30–50 RDKit questions with the known correct
-  file/function, and an `rdkit-rag eval` command reporting recall@k and MRR.
-  *Done when* every later change can be compared against a baseline number.
+- [x] **Evaluation set**: 45 RDKit questions (30 concept, 15 identifier)
+  with the known correct file/function, and `rdkit-rag eval` reporting
+  Recall@k and MRR. Baseline in `eval/baseline.json`: hybrid R@10 0.49,
+  MRR 0.33 (identifier R@10 0.93, concept R@10 0.27).
 - [x] **Hybrid search**: BM25 keyword search merged with vector results
   (reciprocal rank fusion), with code-aware tokenization. Targets exact
   identifiers such as `MolToSmiles` or `sanitizeMol` that embeddings often
-  miss. Still to do: confirm the gain on the evaluation set above.
+  miss. Measured: hybrid has the best R@5/R@10, but keyword alone has a
+  slightly higher MRR (0.35 vs 0.33).
+- [ ] **Fix concept questions** (R@10 0.27): the baseline shows they mostly
+  retrieve documentation and its Japanese translation (`Docs/Book_jp/`)
+  instead of the implementing code, plus headers instead of `.cpp` files.
+  Try: skipping or down-weighting duplicate translations, a code/docs
+  filter, and linking a header declaration to its definition.
 - [ ] **Reranking**: re-order the top ~50 candidates with a cross-encoder.
-  *Done when* it improves MRR without making search too slow.
+  *Done when* it improves MRR on the eval set without making search too slow.
 
 ## Phase 2: Deeper code understanding
 
