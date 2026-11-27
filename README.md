@@ -31,14 +31,15 @@ Code / Documentation Chunker
    (C/C++: heuristic brace matching)
         |
         v
-sentence-transformers Embeddings
+sentence-transformers Embeddings  +  BM25 Keyword Index
         |
         v
 Local Storage (.data/)
-   chunks.jsonl + embeddings.npy + index_metadata.json
+   chunks.jsonl + embeddings.npy + bm25_weights.npz + index_metadata.json
         |
         v
-NumPy Cosine Similarity Search
+Hybrid Search
+   (NumPy cosine similarity + BM25, merged by reciprocal rank fusion)
         |
         v
 Top Relevant Chunks
@@ -128,7 +129,26 @@ rdkit-rag search "How are SMILES parsed?" --top-k 5
 ```
 
 Prints the top matching chunks with file, symbol, and line-range info plus
-the chunk content, ranked by cosine similarity.
+the chunk content.
+
+By default search is **hybrid**: it ranks chunks both by meaning (cosine
+similarity of embeddings) and by keywords (BM25), then merges the two
+rankings with reciprocal rank fusion. Each result shows its rank in both,
+e.g. `(vector #4, keyword #1)`. Use `--mode` to pick one method:
+
+```bash
+rdkit-rag search "MolToSmiles" --mode keyword   # exact names; fast, no embedding model
+rdkit-rag search "how are rings perceived" --mode vector
+```
+
+The keyword index is code-aware: identifiers are matched whole and by their
+camelCase / snake_case parts (`MolToSmiles` also matches "smiles"), related
+word forms are merged (kekulization / kekulize), and test files are ranked
+below implementation files that use the same words. It is built during
+`rdkit-rag index`; indexes made with older versions get it built
+automatically, in a few seconds, on first search.
+
+`ask` accepts the same `--mode` option.
 
 ### 3. Ask a question (uses Ollama)
 
@@ -164,8 +184,8 @@ is required to run the suite.
 
 ## Current limitations
 
-- Vector search only - no lexical/keyword search, no hybrid retrieval, no
-  reranking.
+- No reranking step after hybrid retrieval, and no evaluation set yet to
+  measure retrieval quality systematically.
 - C/C++ chunking is heuristic (signature detection + brace counting), not a
   real parser. It handles typical function/method definitions well but can
   miss unusual formatting; it falls back to overlapping line-based chunks
@@ -183,3 +203,8 @@ is required to run the suite.
   repositories or many concurrent users.
 
 See [ROADMAP.md](ROADMAP.md) for planned work.
+
+## License
+
+rdkit-rag is released under the BSD 3-Clause License, the same license as
+RDKit. See [LICENSE](LICENSE).

@@ -73,7 +73,9 @@ def test_retriever_returns_most_relevant_chunk(tmp_path: Path):
     fake_service = FakeEmbeddingService(np.array([1.0, 0.0, 0.0], dtype="float32"))
     retriever = Retriever(config, embedding_service=fake_service)
 
-    results = retriever.search("Where is molecule sanitization implemented?", top_k=1)
+    results = retriever.search(
+        "Where is molecule sanitization implemented?", top_k=1, mode="vector"
+    )
 
     assert len(results) == 1
     assert results[0].chunk.symbol_name == "sanitizeMol"

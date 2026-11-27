@@ -8,6 +8,7 @@ from pathlib import Path
 from .chunker import chunk_file
 from .config import Config
 from .embeddings import EmbeddingService, build_contextual_text
+from .keyword import KeywordIndex
 from .models import Chunk
 from .scanner import scan_repository
 from .store import index_exists, make_metadata, save_chunks, save_embeddings, save_metadata
@@ -69,6 +70,10 @@ def run_index(repo_path: Path, config: Config, force: bool = False) -> IndexResu
         import numpy as np
 
         save_embeddings(np.zeros((0, 0), dtype="float32"), config.embeddings_path)
+
+    KeywordIndex.build(all_chunks).save(
+        config.keyword_weights_path, config.keyword_vocab_path
+    )
 
     metadata = make_metadata(repo_path, len(all_chunks), config.embedding_model)
     save_metadata(metadata, config.metadata_path)

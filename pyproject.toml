@@ -3,11 +3,14 @@ name = "rdkit-rag"
 version = "0.1.0"
 description = "Local-first RAG MVP for exploring the RDKit codebase."
 requires-python = ">=3.11"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 dependencies = [
     "typer>=0.12",
     "pydantic>=2.6",
     "sentence-transformers>=2.7",
     "numpy>=1.26",
+    "scipy>=1.11",
     "ollama>=0.2",
     "python-dotenv>=1.0",
 ]
@@ -19,7 +22,7 @@ dev = ["pytest>=8.0"]
 rdkit-rag = "rdkit_rag.cli:app"
 
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
