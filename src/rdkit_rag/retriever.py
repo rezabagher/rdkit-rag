@@ -110,6 +110,13 @@ class Retriever:
             self._keyword_index = index
         return self._keyword_index
 
+    @property
+    def chunks(self) -> list[Chunk]:
+        """All indexed chunks, in index order."""
+        self._load()
+        assert self._chunks is not None
+        return self._chunks
+
     def _load(self) -> None:
         if self._chunks is None:
             self._chunks = load_chunks(self.config.chunks_path)

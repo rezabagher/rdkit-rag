@@ -200,6 +200,52 @@ SOURCES USED
 2. Code/GraphMol/testMolOps.cpp:45-90
 ```
 
+### 4. Measure retrieval quality
+
+```bash
+rdkit-rag eval                 # all three search modes side by side
+rdkit-rag eval --mode hybrid --details
+rdkit-rag eval --output results.json
+```
+
+The built-in question set (`src/rdkit_rag/data/rdkit_questions.toml`,
+installed with the package) holds 45 questions about RDKit, each with the
+file (and usually the function) where the answer is implemented, checked
+against a pinned RDKit commit. `rdkit-rag eval` runs them through search and
+reports Recall@k (share of questions with a relevant chunk in the top k) and
+MRR (mean reciprocal rank of the first relevant chunk), overall and per
+category:
+
+- **concept**: plain-English questions with no code names
+  ("How are tautomers enumerated?")
+- **identifier**: questions that name the function ("Where is sanitizeMol
+  implemented?")
+
+Only the primary implementation counts as relevant; a header, wrapper or
+documentation hit counts as a miss, so the scores are a lower bound. It warns
+if a listed location is missing from the index (e.g. after RDKit renamed a
+file).
+
+Baseline (RDKit `ce08c344e`, `BAAI/bge-base-en-v1.5`, full results in
+`eval/baseline.json`). To reproduce it, index that RDKit commit with
+`EMBEDDING_MODEL=BAAI/bge-base-en-v1.5`; the default `bge-small` model gives
+different vector and hybrid scores (keyword scores don't depend on the
+model):
+
+| mode    | R@1  | R@5  | R@10 | MRR  | concept R@10 | identifier R@10 |
+|---------|------|------|------|------|--------------|-----------------|
+| hybrid  | 0.24 | 0.44 | 0.49 | 0.33 | 0.27         | 0.93            |
+| vector  | 0.18 | 0.40 | 0.44 | 0.26 | 0.23         | 0.87            |
+| keyword | 0.29 | 0.40 | 0.49 | 0.35 | 0.30         | 0.87            |
+
+Identifier questions work well. Concept questions mostly retrieve the
+documentation that explains the concept (and its Japanese translation)
+rather than the code that implements it. That is the main target for
+future retrieval work.
+
+To evaluate another codebase, write a question set in the same format and
+pass its path: `rdkit-rag eval my_questions.toml`.
+
 ## Running tests
 
 ```bash

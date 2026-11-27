@@ -101,3 +101,10 @@ def test_saved_embeddings_keep_their_file_name(tmp_path: Path):
     save_embeddings(np.ones((2, 3), dtype="float32"), path)
 
     assert sorted(p.name for p in tmp_path.iterdir()) == ["embeddings.npy"]
+
+
+def test_truncated_metadata_loads_as_missing(tmp_path: Path):
+    path = tmp_path / "index_metadata.json"
+    path.write_text('{"repository_path": "/x"')
+
+    assert load_metadata(path) is None
