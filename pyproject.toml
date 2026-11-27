@@ -1,7 +1,23 @@
 [project]
 name = "rdkit-rag"
 version = "0.1.0"
-description = "Local-first RAG MVP for exploring the RDKit codebase."
+description = "Local code search and question answering for the RDKit codebase."
+readme = "README.md"
+authors = [{ name = "reza bagheri alashti" }]
+keywords = ["rdkit", "cheminformatics", "retrieval-augmented generation", "code search", "ollama"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Software Development :: Documentation",
+]
 requires-python = ">=3.11"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
@@ -17,6 +33,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+
+[project.urls]
+Homepage = "https://github.com/rezabagher/rdkit-rag"
+Issues = "https://github.com/rezabagher/rdkit-rag/issues"
+Changelog = "https://github.com/rezabagher/rdkit-rag/blob/main/CHANGELOG.md"
 
 [project.scripts]
 rdkit-rag = "rdkit_rag.cli:app"

@@ -3,7 +3,7 @@
 Where rdkit-rag is today and what comes next. Phases are ordered by value:
 measure first, then improve retrieval, then deepen code understanding.
 
-## Current state (v0.1)
+## Current state (v0.1, beta)
 
 - Index Python, C/C++, Markdown and RST; respects `.gitignore`
 - Language-aware chunking: `ast` for Python, heuristic signature + brace

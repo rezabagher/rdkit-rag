@@ -1,5 +1,7 @@
 # rdkit-rag
 
+[![tests](https://github.com/rezabagher/rdkit-rag/actions/workflows/tests.yml/badge.svg)](https://github.com/rezabagher/rdkit-rag/actions/workflows/tests.yml)
+
 rdkit-rag is a local question-answering tool for the
 [RDKit](https://github.com/rdkit/rdkit) cheminformatics codebase. RDKit is a
 large mix of C++ and Python, about 2,200 source and doc files, and it's hard
@@ -14,8 +16,8 @@ the exact files and line numbers it used. Everything runs on your own machine
 with no API keys or cloud services. Developers can explore an unfamiliar
 codebase in natural language and check every claim against the real source.
 
-This is an MVP. It favors simplicity and readability over completeness -
-see [Current limitations](#current-limitations).
+This is a beta release (0.1). It favors simplicity and readability over
+completeness - see [Current limitations](#current-limitations).
 
 ## Architecture
 
@@ -61,14 +63,21 @@ Answer + Source Citations
 ## Installation
 
 ```bash
-git clone <this-repo> rdkit-rag
+git clone https://github.com/rezabagher/rdkit-rag.git
 cd rdkit-rag
 pip install -e ".[dev]"
 ```
 
 This installs the `rdkit-rag` CLI along with its runtime dependencies
-(`typer`, `pydantic`, `sentence-transformers`, `numpy`, `ollama`,
+(`typer`, `pydantic`, `sentence-transformers`, `numpy`, `scipy`, `ollama`,
 `python-dotenv`) and `pytest` for running the test suite.
+
+Without an NVIDIA GPU, install the CPU-only build of PyTorch first; it is
+about 2 GB smaller than the default:
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+```
 
 ## Ollama setup
 
@@ -258,8 +267,9 @@ is required to run the suite.
 
 ## Current limitations
 
-- No reranking step after hybrid retrieval, and no evaluation set yet to
-  measure retrieval quality systematically.
+- No reranking step after hybrid retrieval. On the built-in benchmark,
+  plain-English "how does X work" questions find the implementing code in
+  the top 10 only about a quarter of the time (identifier questions: 93%).
 - C/C++ chunking is heuristic (signature detection + brace counting), not a
   real parser. It handles typical function/method definitions well but can
   miss unusual formatting; it falls back to overlapping line-based chunks
@@ -278,6 +288,12 @@ is required to run the suite.
   repositories or many concurrent users.
 
 See [ROADMAP.md](ROADMAP.md) for planned work.
+
+## Contributing
+
+Bug reports and pull requests are welcome; see
+[CONTRIBUTING.md](CONTRIBUTING.md). Changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
