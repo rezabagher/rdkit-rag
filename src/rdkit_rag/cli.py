@@ -12,10 +12,12 @@ from .answering import answer_question
 from .config import get_config
 from .evaluation import (
     QuestionSetError,
+    default_questions_path,
     evaluate,
     load_questions,
     missing_targets,
     report_to_dict,
+    same_commit,
 )
 from .indexer import RepositoryNotFoundError, run_index
 from .ollama_client import (
@@ -197,13 +199,12 @@ class EvalMode(str, Enum):
     keyword = "keyword"
 
 
-DEFAULT_QUESTIONS = Path("eval/rdkit_questions.toml")
-
-
 @app.command("eval")
 def eval_command(
-    questions: Path = typer.Argument(
-        DEFAULT_QUESTIONS, help="Question set (TOML) with the known relevant locations."
+    questions: Path | None = typer.Argument(
+        None,
+        help="Question set (TOML) with the known relevant locations. "
+        "Default: the built-in RDKit set.",
     ),
     mode: EvalMode = typer.Option(
         EvalMode.all, "--mode", help="Search mode to evaluate, or 'all' to compare them."
@@ -219,11 +220,20 @@ def eval_command(
     ),
 ) -> None:
     """Measure retrieval quality (Recall@k, MRR) on a fixed question set."""
+    questions_path = questions if questions is not None else default_questions_path()
     try:
-        question_set = load_questions(questions)
+        question_set = load_questions(questions_path)
     except QuestionSetError as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(code=1)
+
+    # Fail on an unusable --output now, not after a possibly long run.
+    if output is not None:
+        try:
+            output.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            typer.secho(f"Cannot write results to {output}: {e}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
 
     config = get_config()
     retriever = Retriever(config)
@@ -235,7 +245,11 @@ def eval_command(
 
     metadata = load_metadata(config.metadata_path)
     index_commit = metadata.repository_commit if metadata else None
-    if question_set.commit and index_commit and index_commit != question_set.commit:
+    if (
+        question_set.commit
+        and index_commit
+        and not same_commit(index_commit, question_set.commit)
+    ):
         typer.secho(
             f"Note: the index is of commit {index_commit[:12]}, but the question "
             f"set was checked against {question_set.commit[:12]}.",
@@ -292,14 +306,18 @@ def eval_command(
 
     if output is not None:
         payload = {
-            "questions": str(questions),
+            "questions": "built-in" if questions is None else str(questions),
             "question_set_commit": question_set.commit,
             "index_commit": index_commit,
             "embedding_model": metadata.embedding_model if metadata else None,
             "ks": list(ks),
             "results": [report_to_dict(r) for r in reports],
         }
-        output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        try:
+            output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except OSError as e:
+            typer.secho(f"Cannot write results to {output}: {e}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
         typer.echo(f"Results written to {output}")
 
 

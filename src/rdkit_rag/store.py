@@ -90,9 +90,12 @@ def save_metadata(metadata: IndexMetadata, path: Path) -> None:
 
 
 def load_metadata(path: Path) -> IndexMetadata | None:
-    if not path.exists():
+    """The index metadata, or None if it is missing or unreadable (e.g.
+    truncated). Callers then fall back to defaults; indexing rebuilds."""
+    try:
+        return IndexMetadata.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):  # pydantic's ValidationError is a ValueError
         return None
-    return IndexMetadata.model_validate_json(path.read_text(encoding="utf-8"))
 
 
 def make_metadata(

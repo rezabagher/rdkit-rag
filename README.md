@@ -208,7 +208,8 @@ rdkit-rag eval --mode hybrid --details
 rdkit-rag eval --output results.json
 ```
 
-`eval/rdkit_questions.toml` holds 45 questions about RDKit, each with the
+The built-in question set (`src/rdkit_rag/data/rdkit_questions.toml`,
+installed with the package) holds 45 questions about RDKit, each with the
 file (and usually the function) where the answer is implemented, checked
 against a pinned RDKit commit. `rdkit-rag eval` runs them through search and
 reports Recall@k (share of questions with a relevant chunk in the top k) and
@@ -226,7 +227,10 @@ if a listed location is missing from the index (e.g. after RDKit renamed a
 file).
 
 Baseline (RDKit `ce08c344e`, `BAAI/bge-base-en-v1.5`, full results in
-`eval/baseline.json`):
+`eval/baseline.json`). To reproduce it, index that RDKit commit with
+`EMBEDDING_MODEL=BAAI/bge-base-en-v1.5`; the default `bge-small` model gives
+different vector and hybrid scores (keyword scores don't depend on the
+model):
 
 | mode    | R@1  | R@5  | R@10 | MRR  | concept R@10 | identifier R@10 |
 |---------|------|------|------|------|--------------|-----------------|
@@ -240,7 +244,7 @@ rather than the code that implements it. That is the main target for
 future retrieval work.
 
 To evaluate another codebase, write a question set in the same format and
-pass its path.
+pass its path: `rdkit-rag eval my_questions.toml`.
 
 ## Running tests
 

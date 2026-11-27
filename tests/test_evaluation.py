@@ -15,16 +15,16 @@ from rdkit_rag.evaluation import (
     Target,
     evaluate,
     first_relevant_rank,
+    default_questions_path,
     load_questions,
     missing_targets,
+    same_commit,
     score,
 )
 from rdkit_rag.indexer import run_index
 from rdkit_rag.models import Chunk
 from rdkit_rag.retriever import SearchResult
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-SHIPPED_QUESTIONS = REPO_ROOT / "eval" / "rdkit_questions.toml"
 
 
 def _chunk(path: str, symbol: str | None, i: int = 0) -> Chunk:
@@ -143,7 +143,17 @@ def test_load_questions(tmp_path):
     "text,message",
     [
         ("", "No .*question.* entries"),
-        ('[[question]]\nid = "x"\nquery = "q"\n', "missing"),
+        ('[[question]]\nid = "x"\nquery = "q"\n', "missing 'relevant'"),
+        ('[question]\nid = "x"\n', r"\[\[question\]\] tables"),
+        ('question = ["x"]\n', "must be a table"),
+        ('[[question]]\nid = "x"\nquery = "q"\nrelevant = ["a.cpp"]\n', "must look like"),
+        ('[[question]]\nid = "x"\nquery = "q"\nrelevant = [{ file = 3 }]\n', "'file' must be"),
+        ('[[question]]\nid = 7\nquery = "q"\nrelevant = [{ file = "a" }]\n', "'id' must be"),
+        (
+            'rdkit_commit = 123\n[[question]]\nid = "x"\nquery = "q"\n'
+            'relevant = [{ file = "a" }]\n',
+            "rdkit_commit must be",
+        ),
         ('[[question]]\nid = "x"\nquery = "q"\nrelevant = []\n', "no relevant"),
         (
             '[[question]]\nid = "x"\nquery = "q"\nrelevant = [{ file = "a" }]\n' * 2,
@@ -157,8 +167,15 @@ def test_load_questions_rejects_bad_sets(tmp_path, text, message):
         load_questions(_write(tmp_path, text))
 
 
+def test_same_commit_allows_short_hashes():
+    full = "ce08c344e86dbb07c86526cca2517436b1e41b02"
+    assert same_commit(full, "ce08c344e")
+    assert same_commit("CE08C344E", full)
+    assert not same_commit(full, "ce08c344f")
+
+
 def test_shipped_question_set_is_well_formed():
-    question_set = load_questions(SHIPPED_QUESTIONS)
+    question_set = load_questions(default_questions_path())
     assert len(question_set.questions) >= 30
     assert {q.category for q in question_set.questions} == {"concept", "identifier"}
     assert question_set.commit and len(question_set.commit) == 40
@@ -213,3 +230,76 @@ def test_eval_command_keyword_mode_end_to_end(tmp_path, monkeypatch):
     assert keyword["mode"] == "keyword"
     assert keyword["ranks"] == {"kek": 1, "nope": None}
     assert keyword["overall"]["recall@1"] == 0.5
+
+
+def _tiny_index(tmp_path: Path, monkeypatch) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "molops.py").write_text("def kekulize_rings(mol):\n    return mol\n")
+    data_dir = tmp_path / "data"
+    run_index(
+        repo,
+        Config(data_dir=data_dir, embedding_model="fake"),
+        embedding_service=FakeEmbeddingService(),
+    )
+    monkeypatch.setenv("RDKIT_RAG_DATA_DIR", str(data_dir))
+    return data_dir
+
+
+def test_eval_uses_built_in_questions_from_any_directory(tmp_path, monkeypatch):
+    _tiny_index(tmp_path, monkeypatch)
+    monkeypatch.chdir(tmp_path)  # no eval/ directory here
+
+    result = CliRunner().invoke(app, ["eval", "--mode", "keyword"])
+
+    assert result.exit_code == 0, result.output
+    assert "45 questions" in result.output
+
+
+def test_eval_creates_the_output_directory(tmp_path, monkeypatch):
+    _tiny_index(tmp_path, monkeypatch)
+    questions = _write(
+        tmp_path,
+        '[[question]]\nid = "k"\nquery = "kekulize_rings"\n'
+        'relevant = [{ file = "molops.py" }]\n',
+    )
+    out = tmp_path / "results" / "run1.json"
+
+    result = CliRunner().invoke(
+        app, ["eval", str(questions), "--mode", "keyword", "--output", str(out)]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(out.read_text())["results"][0]["ranks"] == {"k": 1}
+
+
+def test_eval_short_commit_in_question_set_is_not_a_mismatch(tmp_path, monkeypatch):
+    data_dir = _tiny_index(tmp_path, monkeypatch)
+    meta_path = data_dir / "index_metadata.json"
+    meta = json.loads(meta_path.read_text())
+    meta["repository_commit"] = "ce08c344e86dbb07c86526cca2517436b1e41b02"
+    meta_path.write_text(json.dumps(meta))
+    questions = _write(
+        tmp_path,
+        'rdkit_commit = "ce08c344e"\n[[question]]\nid = "k"\nquery = "kekulize_rings"\n'
+        'relevant = [{ file = "molops.py" }]\n',
+    )
+
+    result = CliRunner().invoke(app, ["eval", str(questions), "--mode", "keyword"])
+
+    assert result.exit_code == 0, result.output
+    assert "Note:" not in result.output
+
+
+def test_eval_survives_truncated_metadata(tmp_path, monkeypatch):
+    data_dir = _tiny_index(tmp_path, monkeypatch)
+    (data_dir / "index_metadata.json").write_text('{"repository_pa')
+    questions = _write(
+        tmp_path,
+        '[[question]]\nid = "k"\nquery = "kekulize_rings"\n'
+        'relevant = [{ file = "molops.py" }]\n',
+    )
+
+    result = CliRunner().invoke(app, ["eval", str(questions), "--mode", "keyword"])
+
+    assert result.exit_code == 0, result.output

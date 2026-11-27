@@ -13,7 +13,7 @@ measure first, then improve retrieval, then deepen code understanding.
 - `search` and `ask` (Ollama) with cited sources
 - Incremental updates: re-running `index` embeds only new or changed code
 - `rdkit-rag eval`: 45-question benchmark reporting Recall@k and MRR
-- 102 unit tests, no model download needed to run them
+- 114 unit tests, no model download needed to run them
 
 Measured on RDKit (laptop, GTX 1650 Ti): 2,201 files, 25,004 chunks,
 ~20 min for a first full index, ~16 s for an update with no changes,

@@ -2,7 +2,8 @@
 Recall@k and MRR, so changes to chunking or ranking can be compared against
 a baseline number.
 
-A question set is a TOML file (see eval/rdkit_questions.toml). Each question
+A question set is a TOML file. The built-in RDKit set ships with the
+package (src/rdkit_rag/data/rdkit_questions.toml). Each question
 lists the chunks that answer it, as a file plus an optional symbol name.
 
 Metrics, over the first max(ks) results of each question:
@@ -17,8 +18,9 @@ from __future__ import annotations
 import tomllib
 from collections import defaultdict
 from dataclasses import dataclass, field
+from importlib import resources
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from .models import Chunk
 
@@ -62,6 +64,48 @@ class QuestionSet:
     commit: str | None = None
 
 
+def default_questions_path() -> Path:
+    """The built-in RDKit question set, installed with the package."""
+    return Path(str(resources.files("rdkit_rag") / "data" / "rdkit_questions.toml"))
+
+
+def _string(value: Any, what: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise QuestionSetError(f"{what} must be a non-empty string, got {value!r}")
+    return value
+
+
+def _parse_question(raw: Any, n: int) -> Question:
+    if not isinstance(raw, dict):
+        raise QuestionSetError(f"Question #{n} must be a table ([[question]])")
+    for key in ("id", "query", "relevant"):
+        if key not in raw:
+            raise QuestionSetError(f"Question #{n} is missing {key!r}")
+    qid = _string(raw["id"], f"Question #{n}: 'id'")
+    where = f"Question {qid!r}"
+    query = _string(raw["query"], f"{where}: 'query'")
+    category = _string(raw.get("category", "uncategorized"), f"{where}: 'category'")
+
+    relevant = raw["relevant"]
+    if not isinstance(relevant, list) or not relevant:
+        raise QuestionSetError(f"{where} has no relevant locations")
+    targets = []
+    for entry in relevant:
+        if not isinstance(entry, dict) or "file" not in entry:
+            raise QuestionSetError(
+                f'{where}: each relevant location must look like {{ file = "...", '
+                f'symbol = "..." }}, got {entry!r}'
+            )
+        symbol = entry.get("symbol")
+        targets.append(
+            Target(
+                file=_string(entry["file"], f"{where}: 'file'"),
+                symbol=None if symbol is None else _string(symbol, f"{where}: 'symbol'"),
+            )
+        )
+    return Question(id=qid, query=query, category=category, relevant=tuple(targets))
+
+
 def load_questions(path: Path) -> QuestionSet:
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -70,32 +114,33 @@ def load_questions(path: Path) -> QuestionSet:
     except tomllib.TOMLDecodeError as e:
         raise QuestionSetError(f"Invalid TOML in {path}: {e}") from e
 
+    raw_questions = data.get("question", [])
+    if not isinstance(raw_questions, list):
+        raise QuestionSetError(f"In {path}, questions must be [[question]] tables")
+
     questions: list[Question] = []
     seen: set[str] = set()
-    for n, raw in enumerate(data.get("question", []), start=1):
-        try:
-            qid = str(raw["id"])
-            targets = tuple(
-                Target(file=t["file"], symbol=t.get("symbol")) for t in raw["relevant"]
-            )
-            question = Question(
-                id=qid,
-                query=str(raw["query"]),
-                category=str(raw.get("category", "uncategorized")),
-                relevant=targets,
-            )
-        except (KeyError, TypeError) as e:
-            raise QuestionSetError(f"Question #{n} in {path} is missing {e}") from e
-        if not targets:
-            raise QuestionSetError(f"Question {qid!r} has no relevant locations")
-        if qid in seen:
-            raise QuestionSetError(f"Duplicate question id {qid!r}")
-        seen.add(qid)
+    for n, raw in enumerate(raw_questions, start=1):
+        question = _parse_question(raw, n)
+        if question.id in seen:
+            raise QuestionSetError(f"Duplicate question id {question.id!r}")
+        seen.add(question.id)
         questions.append(question)
 
     if not questions:
         raise QuestionSetError(f"No [[question]] entries in {path}")
-    return QuestionSet(questions=questions, commit=data.get("rdkit_commit"))
+
+    commit = data.get("rdkit_commit")
+    if commit is not None:
+        commit = _string(commit, "rdkit_commit")
+    return QuestionSet(questions=questions, commit=commit)
+
+
+def same_commit(a: str, b: str) -> bool:
+    """True if two commit hashes name the same commit, allowing either to be
+    abbreviated (git's short hashes are prefixes of the full one)."""
+    a, b = a.strip().lower(), b.strip().lower()
+    return a.startswith(b) or b.startswith(a)
 
 
 def first_relevant_rank(chunks: list[Chunk], targets: tuple[Target, ...]) -> int | None:
