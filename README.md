@@ -50,14 +50,16 @@ flowchart TD
         qtok["Tokenize the query<br/>(same tokenizer as the index)"]
         bm25["BM25 scoring<br/>top 50 chunks"]
         rrf["Reciprocal rank fusion<br/>score = sum of 1 / (60 + rank)"]
+        links["Definition links<br/>code names mentioned in the top 3<br/>doc/header results -> the chunks<br/>that define them, fused in"]
         topk["Top-k chunks<br/>file, symbol, lines"]
         question --> qemb --> cosine --> rrf
         question --> qtok --> bm25 --> rrf
-        rrf --> topk
+        rrf --> links --> topk
     end
 
     store -. embeddings .-> cosine
     store -. BM25 weights .-> bm25
+    store -. symbol names .-> links
 
     topk --> searchout["search: print the chunks<br/>(default top 8)"]
     topk --> context["ask: context from the top 6<br/>(at most 12,000 characters)"]
@@ -67,7 +69,8 @@ flowchart TD
 ```
 
 `--mode vector` and `--mode keyword` use only one branch of the retrieval
-step, without fusion; keyword mode never loads the embedding model.
+step, without fusion or definition links; keyword mode never loads the
+embedding model.
 
 ## Requirements
 
@@ -194,6 +197,18 @@ rdkit-rag search "MolToSmiles" --mode keyword   # exact names; fast, no embeddin
 rdkit-rag search "how are rings perceived" --mode vector
 ```
 
+Hybrid search also follows **definition links**. A plain-English question
+is often matched best by text that explains the concept, such as a section
+of the RDKit Book or a commented declaration in a header, while the code
+that implements it uses different words. Those texts name the functions
+involved, so the code names mentioned in the top 3 documentation and header
+results (e.g. `findSSSR`, `SanitizeMol`) are looked up among the indexed
+definitions, and the defining chunks are merged into the ranking. Such
+results are marked, e.g. `(defines FastFindRings in
+Docs/Book/RDKit_Book.rst)`. Only names that look like code (camelCase or
+snake_case) are followed, and declarations in headers and test code are
+skipped as targets.
+
 The keyword index is code-aware: identifiers are matched whole and by their
 camelCase / snake_case parts (`MolToSmiles` also matches "smiles"), related
 word forms are merged (kekulization / kekulize), and test files are ranked
@@ -259,14 +274,24 @@ model):
 
 | mode    | R@1  | R@5  | R@10 | MRR  | concept R@10 | identifier R@10 |
 |---------|------|------|------|------|--------------|-----------------|
-| hybrid  | 0.24 | 0.44 | 0.49 | 0.33 | 0.27         | 0.93            |
+| hybrid  | 0.42 | 0.58 | 0.62 | 0.47 | 0.43         | 1.00            |
 | vector  | 0.18 | 0.40 | 0.44 | 0.26 | 0.23         | 0.87            |
 | keyword | 0.29 | 0.40 | 0.49 | 0.35 | 0.30         | 0.87            |
 
-Identifier questions work well. Concept questions mostly retrieve the
-documentation that explains the concept (and its Japanese translation)
-rather than the code that implements it. That is the main target for
-future retrieval work.
+Definition links (see [search](#2-search-no-llm-required)) raised hybrid
+concept R@10 from 0.27 to 0.43 and MRR from 0.14 to 0.30. Because that
+method was chosen while looking at these 45 questions, it was then checked
+once on 18 new concept questions written afterwards
+(`eval/heldout_questions.toml`, results in `eval/heldout_results.json`):
+hybrid R@10 went from 0.33 to 0.44 and MRR from 0.11 to 0.32 there, too.
+
+```bash
+rdkit-rag eval eval/heldout_questions.toml
+```
+
+Concept questions are still the weak spot: more than half don't find the
+implementing code in the top 10, usually because the documentation that
+explains the concept never names the function.
 
 To evaluate another codebase, write a question set in the same format and
 pass its path: `rdkit-rag eval my_questions.toml`.
@@ -285,14 +310,16 @@ is required to run the suite.
 
 - No reranking step after hybrid retrieval. On the built-in benchmark,
   plain-English "how does X work" questions find the implementing code in
-  the top 10 only about a quarter of the time (identifier questions: 93%).
+  the top 10 a little under half the time (identifier questions: 100%).
 - C/C++ chunking is heuristic (signature detection + brace counting), not a
   real parser. It handles typical function/method definitions well but can
   miss unusual formatting; it falls back to overlapping line-based chunks
   when it can't confidently find functions in a file.
 - No call graph or cross-reference analysis.
 - No Python/C++ binding detection (e.g. linking `rdkit.Chem` Python calls to
-  their C++ implementations).
+  their C++ implementations). Definition links therefore take a Python name
+  in the docs, such as `GetSSSR`, to its Boost.Python wrapper rather than to
+  the C++ function the wrapper calls (`findSSSR`).
 - No test-to-implementation relationship detection.
 - The index records which embedding model built it, and `search`/`ask`
   always embed queries with that model. Changing `EMBEDDING_MODEL` takes

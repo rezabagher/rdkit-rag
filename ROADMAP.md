@@ -12,8 +12,11 @@ measure first, then improve retrieval, then deepen code understanding.
   combined into hybrid search
 - `search` and `ask` (Ollama) with cited sources
 - Incremental updates: re-running `index` embeds only new or changed code
-- `rdkit-rag eval`: 45-question benchmark reporting Recall@k and MRR
-- 114 unit tests, no model download needed to run them
+- `rdkit-rag eval`: 45-question benchmark reporting Recall@k and MRR,
+  plus 18 held-out questions
+- Definition links: hybrid search follows code names in the top docs and
+  headers to the code that defines them
+- 127 unit tests, no model download needed to run them
 
 Measured on RDKit (laptop, GTX 1650 Ti): 2,201 files, 25,004 chunks,
 ~20 min for a first full index, ~16 s for an update with no changes,
@@ -23,20 +26,31 @@ Measured on RDKit (laptop, GTX 1650 Ti): 2,201 files, 25,004 chunks,
 
 - [x] **Evaluation set**: 45 RDKit questions (30 concept, 15 identifier)
   with the known correct file/function, and `rdkit-rag eval` reporting
-  Recall@k and MRR. Baseline in `eval/baseline.json`: hybrid R@10 0.49,
-  MRR 0.33 (identifier R@10 0.93, concept R@10 0.27).
+  Recall@k and MRR. First baseline: hybrid R@10 0.49, MRR 0.33
+  (identifier R@10 0.93, concept R@10 0.27). Plus 18 held-out concept
+  questions (`eval/heldout_questions.toml`) for checking changes that were
+  tuned on the main set.
 - [x] **Hybrid search**: BM25 keyword search merged with vector results
   (reciprocal rank fusion), with code-aware tokenization. Targets exact
   identifiers such as `MolToSmiles` or `sanitizeMol` that embeddings often
   miss. Measured: hybrid has the best R@5/R@10, but keyword alone has a
   slightly higher MRR (0.35 vs 0.33).
-- [ ] **Fix concept questions** (R@10 0.27): the baseline shows they mostly
-  retrieve documentation and its Japanese translation (`Docs/Book_jp/`)
-  instead of the implementing code, plus headers instead of `.cpp` files.
-  Try: skipping or down-weighting duplicate translations, a code/docs
-  filter, and linking a header declaration to its definition.
+- [x] **Definition links for concept questions**: concept questions mostly
+  retrieved documentation and headers instead of the implementing code.
+  Hybrid search now follows code names mentioned in the top doc/header
+  results to their definitions. Concept R@10 0.27 -> 0.43, MRR 0.14 -> 0.30;
+  held-out R@10 0.33 -> 0.44, MRR 0.11 -> 0.32; identifier R@10 0.93 -> 1.00.
+  Tried and rejected (gain of at most one question): dropping the Japanese
+  doc translations, down-weighting or capping docs, capping chunks per file,
+  boosting the `.cpp` next to a matching header, and reranking with
+  `ms-marco-MiniLM-L-6-v2` (also ~2 s per query).
+- [ ] **Remaining concept misses** (R@10 0.43): often the explaining docs
+  never name the function. Ideas: links from query words to symbol names,
+  a code-specific embedding model.
 - [ ] **Reranking**: re-order the top ~50 candidates with a cross-encoder.
   *Done when* it improves MRR on the eval set without making search too slow.
+  A general web-search reranker (`ms-marco-MiniLM-L-6-v2`) didn't help;
+  next to try: `bge-reranker-base` or a code-trained reranker.
 
 ## Phase 2: Deeper code understanding
 

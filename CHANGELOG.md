@@ -4,6 +4,19 @@ All notable changes to rdkit-rag are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Definition links in hybrid search: code names mentioned in the top
+  documentation and header results are followed to the chunks that define
+  them, which are merged into the ranking and marked in `search` output.
+  Built-in benchmark: concept Recall@10 0.27 -> 0.43, MRR 0.14 -> 0.30;
+  overall hybrid Recall@10 0.49 -> 0.62, MRR 0.33 -> 0.47.
+- `eval/heldout_questions.toml`: 18 held-out concept questions, written
+  after the definition links were developed, to check that the gain is not
+  specific to the built-in set (Recall@10 0.33 -> 0.44, MRR 0.11 -> 0.32).
+
 ## [0.1.0] - 2026-11-28
 
 First public release (beta).
@@ -27,4 +40,5 @@ First public release (beta).
   relevant locations, reporting Recall@k and MRR per search mode and
   category, with optional JSON output. Baseline in `eval/baseline.json`.
 
+[Unreleased]: https://github.com/rezabagher/rdkit-rag/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/rezabagher/rdkit-rag/releases/tag/v0.1.0

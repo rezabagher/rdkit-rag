@@ -1,0 +1,115 @@
+# Held-out concept questions, written after the development set and before
+# running any search on them. Relevant locations come from where the
+# function is defined in RDKit, not from search results.
+rdkit_commit = "ce08c344e86dbb07c86526cca2517436b1e41b02"
+
+[[question]]
+id = "cip-labels"
+query = "How are R/S stereo labels assigned using the Cahn-Ingold-Prelog rules?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/CIPLabeler/CIPLabeler.cpp", symbol = "assignCIPLabels" }]
+
+[[question]]
+id = "smarts-write"
+query = "How is a query molecule written out as a SMARTS string?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/SmilesParse/SmartsWrite.cpp", symbol = "MolToSmarts" }]
+
+[[question]]
+id = "rotatable-bonds"
+query = "How are rotatable bonds counted?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/Descriptors/Lipinski.cpp", symbol = "calcNumRotatableBonds" }]
+
+[[question]]
+id = "formula"
+query = "How is the molecular formula of a molecule generated?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/Descriptors/MolDescriptors.cpp", symbol = "calcMolFormula" }]
+
+[[question]]
+id = "mol-weight"
+query = "How is the average molecular weight calculated?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/Descriptors/MolDescriptors.cpp", symbol = "calcAMW" }]
+
+[[question]]
+id = "pdb-read"
+query = "How is a protein structure read from PDB format?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/FileParsers/PDBParser.cpp", symbol = "MolFromPDBBlock" }]
+
+[[question]]
+id = "distance-matrix"
+query = "How is the topological distance matrix between atoms computed?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/Matrices.cpp", symbol = "getDistanceMat" }]
+
+[[question]]
+id = "shortest-path"
+query = "How is the shortest bond path between two atoms found?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/Matrices.cpp", symbol = "getShortestPath" }]
+
+[[question]]
+id = "brics"
+query = "How are molecules broken into retrosynthetically interesting fragments?"
+category = "concept"
+relevant = [{ file = "rdkit/Chem/BRICS.py", symbol = "BRICSDecompose" }]
+
+[[question]]
+id = "draw-2d"
+query = "How is a molecule rendered as a 2D drawing?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/MolDraw2D/MolDraw2D.cpp", symbol = "drawMolecule" }]
+
+[[question]]
+id = "library-enumeration"
+query = "How are combinatorial libraries enumerated from a reaction and building blocks?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/ChemReactions/Enumerate/Enumerate.cpp" }]
+
+[[question]]
+id = "atom-pairs"
+query = "How are atom pair fingerprints computed?"
+category = "concept"
+relevant = [
+  { file = "Code/GraphMol/Fingerprints/AtomPairGenerator.cpp" },
+  { file = "Code/GraphMol/Fingerprints/AtomPairs.cpp", symbol = "getAtomPairFingerprint" },
+]
+
+[[question]]
+id = "mmff-charges"
+query = "How are MMFF94 partial charges assigned to atoms?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/ForceFieldHelpers/MMFF/AtomTyper.cpp", symbol = "computeMMFFCharges" }]
+
+[[question]]
+id = "fragment-on-bonds"
+query = "How is a molecule cut into fragments at chosen bonds?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/ChemTransforms/MolFragmenter.cpp", symbol = "fragmentOnBonds" }]
+
+[[question]]
+id = "replace-core"
+query = "How is a core substructure removed so that only the side chains remain?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/ChemTransforms/ChemTransforms.cpp", symbol = "replaceCore" }]
+
+[[question]]
+id = "delete-substructure"
+query = "How are all matches of a pattern deleted from a molecule?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/ChemTransforms/ChemTransforms.cpp", symbol = "deleteSubstructs" }]
+
+[[question]]
+id = "surface-area"
+query = "How is the approximate surface area of a molecule computed?"
+category = "concept"
+relevant = [{ file = "Code/GraphMol/Descriptors/MolSurf.cpp", symbol = "calcLabuteASA" }]
+
+[[question]]
+id = "chiral-centers"
+query = "How do I find the chiral centers of a molecule from Python?"
+category = "concept"
+relevant = [{ file = "rdkit/Chem/__init__.py", symbol = "FindMolChiralCenters" }]
