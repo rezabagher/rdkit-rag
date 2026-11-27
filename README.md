@@ -21,37 +21,53 @@ completeness - see [Current limitations](#current-limitations).
 
 ## Architecture
 
+Indexing runs once, then again after each `git pull`; queries read the
+stored index. GitHub renders the diagram below; elsewhere it shows as
+Mermaid source.
+
+```mermaid
+flowchart TD
+    subgraph indexing["Indexing: rdkit-rag index"]
+        repo[("RDKit repository")]
+        scan["Scanner<br/>.py, .cpp/.cc/.cxx/.h/.hpp, .md/.rst<br/>skips git-ignored, binary and over-1-MB files"]
+        chunk["Chunker<br/>Python: ast functions and classes<br/>C/C++: signature + brace matching<br/>docs: sections; fallback: line windows"]
+        ctx["Contextual text<br/>file, language, symbol, line range + content"]
+        cache{"Same text embedded<br/>in the previous index?<br/>(SHA-256 of the text)"}
+        reuse["Reuse the stored vector"]
+        embed["Embed with sentence-transformers<br/>(BGE, new or changed chunks only)"]
+        bm25build["Build BM25 index<br/>code-aware tokens + stemming<br/>test files weighted x0.5"]
+        store[("Local index in .data/<br/>chunks.jsonl, embeddings.npy,<br/>bm25_weights.npz, bm25_vocab.json,<br/>index_metadata.json (model, git commit)")]
+        repo --> scan --> chunk --> ctx --> cache
+        cache -- yes --> reuse --> store
+        cache -- no --> embed --> store
+        chunk --> bm25build --> store
+    end
+
+    subgraph retrieval["Retrieval: hybrid search"]
+        question["Question"]
+        qemb["Embed the query<br/>(same model as the index,<br/>BGE query instruction)"]
+        cosine["Cosine similarity<br/>top 50 chunks"]
+        qtok["Tokenize the query<br/>(same tokenizer as the index)"]
+        bm25["BM25 scoring<br/>top 50 chunks"]
+        rrf["Reciprocal rank fusion<br/>score = sum of 1 / (60 + rank)"]
+        topk["Top-k chunks<br/>file, symbol, lines"]
+        question --> qemb --> cosine --> rrf
+        question --> qtok --> bm25 --> rrf
+        rrf --> topk
+    end
+
+    store -. embeddings .-> cosine
+    store -. BM25 weights .-> bm25
+
+    topk --> searchout["search: print the chunks<br/>(default top 8)"]
+    topk --> context["ask: context from the top 6<br/>(at most 12,000 characters)"]
+    context --> llm["Ollama (local LLM)"]
+    llm --> answer["Answer + cited sources<br/>file:start-end"]
+    topk --> evalout["eval: Recall@k and MRR<br/>on 45 labelled RDKit questions"]
 ```
-RDKit repository
-        |
-        v
-File Scanner (.py, .cpp/.cc/.cxx/.h/.hpp, .md/.rst)
-        |
-        v
-Code / Documentation Chunker
-   (Python: ast module — Markdown/RST: sections)
-   (C/C++: heuristic brace matching)
-        |
-        v
-sentence-transformers Embeddings  +  BM25 Keyword Index
-        |
-        v
-Local Storage (.data/)
-   chunks.jsonl + embeddings.npy + bm25_weights.npz + index_metadata.json
-        |
-        v
-Hybrid Search
-   (NumPy cosine similarity + BM25, merged by reciprocal rank fusion)
-        |
-        v
-Top Relevant Chunks
-        |
-        v
-Ollama (local LLM)
-        |
-        v
-Answer + Source Citations
-```
+
+`--mode vector` and `--mode keyword` use only one branch of the retrieval
+step, without fusion; keyword mode never loads the embedding model.
 
 ## Requirements
 
