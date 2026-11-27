@@ -48,6 +48,8 @@ def _describe_score(result) -> str:
         ranks.append(f"vector #{result.vector_rank}")
     if result.keyword_rank is not None:
         ranks.append(f"keyword #{result.keyword_rank}")
+    if result.linked_from is not None:
+        ranks.append(f"defines {result.linked_from}")
     suffix = f"  ({', '.join(ranks)})" if ranks else ""
     return f"Score: {result.score:.4g}{suffix}"
 

@@ -1,0 +1,130 @@
+{
+  "questions": "eval/heldout_questions.toml",
+  "question_set_commit": "ce08c344e86dbb07c86526cca2517436b1e41b02",
+  "index_commit": "ce08c344e86dbb07c86526cca2517436b1e41b02",
+  "embedding_model": "BAAI/bge-base-en-v1.5",
+  "ks": [
+    1,
+    5,
+    10
+  ],
+  "results": [
+    {
+      "mode": "hybrid",
+      "overall": {
+        "count": 18,
+        "mrr": 0.3181,
+        "recall@1": 0.2778,
+        "recall@5": 0.3889,
+        "recall@10": 0.4444
+      },
+      "by_category": {
+        "concept": {
+          "count": 18,
+          "mrr": 0.3181,
+          "recall@1": 0.2778,
+          "recall@5": 0.3889,
+          "recall@10": 0.4444
+        }
+      },
+      "ranks": {
+        "cip-labels": 1,
+        "smarts-write": null,
+        "rotatable-bonds": null,
+        "formula": 1,
+        "mol-weight": null,
+        "pdb-read": null,
+        "distance-matrix": null,
+        "shortest-path": 1,
+        "brics": null,
+        "draw-2d": null,
+        "library-enumeration": 7,
+        "atom-pairs": 1,
+        "mmff-charges": 4,
+        "fragment-on-bonds": 3,
+        "replace-core": null,
+        "delete-substructure": null,
+        "surface-area": null,
+        "chiral-centers": 1
+      }
+    },
+    {
+      "mode": "vector",
+      "overall": {
+        "count": 18,
+        "mrr": 0.034,
+        "recall@1": 0.0,
+        "recall@5": 0.1111,
+        "recall@10": 0.1667
+      },
+      "by_category": {
+        "concept": {
+          "count": 18,
+          "mrr": 0.034,
+          "recall@1": 0.0,
+          "recall@5": 0.1111,
+          "recall@10": 0.1667
+        }
+      },
+      "ranks": {
+        "cip-labels": null,
+        "smarts-write": null,
+        "rotatable-bonds": null,
+        "formula": null,
+        "mol-weight": null,
+        "pdb-read": null,
+        "distance-matrix": null,
+        "shortest-path": null,
+        "brics": null,
+        "draw-2d": null,
+        "library-enumeration": null,
+        "atom-pairs": null,
+        "mmff-charges": 9,
+        "fragment-on-bonds": null,
+        "replace-core": 4,
+        "delete-substructure": null,
+        "surface-area": null,
+        "chiral-centers": 4
+      }
+    },
+    {
+      "mode": "keyword",
+      "overall": {
+        "count": 18,
+        "mrr": 0.1042,
+        "recall@1": 0.0556,
+        "recall@5": 0.1667,
+        "recall@10": 0.2222
+      },
+      "by_category": {
+        "concept": {
+          "count": 18,
+          "mrr": 0.1042,
+          "recall@1": 0.0556,
+          "recall@5": 0.1667,
+          "recall@10": 0.2222
+        }
+      },
+      "ranks": {
+        "cip-labels": null,
+        "smarts-write": null,
+        "rotatable-bonds": 2,
+        "formula": null,
+        "mol-weight": null,
+        "pdb-read": null,
+        "distance-matrix": null,
+        "shortest-path": null,
+        "brics": null,
+        "draw-2d": null,
+        "library-enumeration": 4,
+        "atom-pairs": 8,
+        "mmff-charges": null,
+        "fragment-on-bonds": null,
+        "replace-core": null,
+        "delete-substructure": null,
+        "surface-area": null,
+        "chiral-centers": 1
+      }
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 """Search over the locally stored index: vector (cosine), keyword (BM25), or
-both combined with reciprocal rank fusion ("hybrid", the default).
+both combined with reciprocal rank fusion ("hybrid", the default). Hybrid
+search also follows code names mentioned in the top documentation and header
+results to their definitions (see linking.py).
 
 This is intentionally not optimized for millions of vectors - it's an MVP
 for searching a single repository's worth of chunks in memory.
@@ -14,6 +16,7 @@ import numpy as np
 from .config import Config
 from .embeddings import EmbeddingService
 from .keyword import KeywordIndex, chunks_fingerprint, reciprocal_rank_fusion
+from .linking import DefinitionIndex
 from .models import Chunk
 from .store import load_chunks, load_embeddings, load_metadata
 
@@ -42,6 +45,9 @@ class SearchResult:
     # chunk among its candidates.
     vector_rank: int | None = None
     keyword_rank: int | None = None
+    # Hybrid mode: set when this chunk defines a code name mentioned by a
+    # documentation or header result, e.g. "findSSSR in Docs/Book/RDKit_Book.rst".
+    linked_from: str | None = None
 
 
 def cosine_similarity_search(
@@ -75,6 +81,7 @@ class Retriever:
         self._chunks: list[Chunk] | None = None
         self._embeddings: np.ndarray | None = None
         self._keyword_index: KeywordIndex | None = None
+        self._definitions: DefinitionIndex | None = None
 
     @property
     def embedding_service(self) -> EmbeddingService:
@@ -109,6 +116,13 @@ class Retriever:
                     pass  # read-only data dir: keep the in-memory index
             self._keyword_index = index
         return self._keyword_index
+
+    @property
+    def definitions(self) -> DefinitionIndex:
+        if self._definitions is None:
+            assert self._chunks is not None
+            self._definitions = DefinitionIndex(self._chunks)
+        return self._definitions
 
     @property
     def chunks(self) -> list[Chunk]:
@@ -175,12 +189,29 @@ class Retriever:
         fused = reciprocal_rank_fusion(
             [[i for i, _ in vector_hits], [i for i, _ in keyword_hits]]
         )
+
+        # Merge in the definitions of code names that the top doc/header
+        # results mention, as a third ranking.
+        ranking = [i for i, _ in fused]
+        links = {}
+        for link in self.definitions.links(ranking):
+            links.setdefault(link.definition, link)
+        if links:
+            fused = reciprocal_rank_fusion([ranking, list(links)])
+
+        def linked_from(i: int) -> str | None:
+            link = links.get(i)
+            if link is None:
+                return None
+            return f"{link.name} in {chunks[link.source].file_path}"
+
         return [
             SearchResult(
                 chunk=chunks[i],
                 score=score,
                 vector_rank=vector_ranks.get(i),
                 keyword_rank=keyword_ranks.get(i),
+                linked_from=linked_from(i),
             )
             for i, score in fused[:top_k]
         ]
