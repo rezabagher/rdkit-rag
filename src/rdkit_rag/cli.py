@@ -9,7 +9,7 @@ import typer
 
 from .answering import answer_question
 from .config import get_config
-from .indexer import IndexAlreadyExistsError, RepositoryNotFoundError, run_index
+from .indexer import RepositoryNotFoundError, run_index
 from .ollama_client import (
     OllamaClient,
     OllamaModelNotFoundError,
@@ -52,25 +52,35 @@ app = typer.Typer(
 def index(
     repo_path: Path = typer.Argument(..., help="Path to a local RDKit repository."),
     force: bool = typer.Option(
-        False, "--force", help="Rebuild the index if one already exists."
+        False, "--force", help="Re-embed everything (ignore existing embeddings)."
     ),
 ) -> None:
-    """Scan, chunk, embed, and store the repository locally."""
+    """Build the index, or update it after the repository changes.
+
+    Re-running on an existing index only embeds new or changed code, so run
+    it again after every git pull.
+    """
     config = get_config()
     try:
         result = run_index(repo_path, config, force=force)
     except RepositoryNotFoundError as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(code=1)
-    except IndexAlreadyExistsError as e:
-        typer.secho(str(e), fg=typer.colors.YELLOW)
-        raise typer.Exit(code=1)
 
     typer.echo()
     typer.echo(f"Repository: {result.repository_name}")
+    if result.repository_commit:
+        typer.echo(f"Commit: {result.repository_commit[:12]}")
     typer.echo(f"Files scanned: {result.files_scanned}")
     typer.echo(f"Files indexed: {result.files_indexed}")
-    typer.echo(f"Chunks created: {result.chunks_created}")
+    typer.echo(f"Chunks: {result.chunks_created:,}")
+    if result.full_rebuild:
+        typer.echo(f"Full rebuild: {result.chunks_embedded:,} chunks embedded")
+    else:
+        typer.echo(
+            f"Updated: {result.chunks_embedded:,} new/changed chunks embedded, "
+            f"{result.chunks_reused:,} reused"
+        )
     typer.echo(f"Embedding model: {result.embedding_model}")
     typer.echo(f"Index location: {result.data_dir}/")
 
